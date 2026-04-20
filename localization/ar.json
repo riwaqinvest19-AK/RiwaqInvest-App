@@ -1,0 +1,26 @@
+{
+  "language": {
+    "chooseTitle": "اختر اللغة",
+    "sectionLabel": "اللغة",
+    "continue": "متابعة",
+    "names": {
+      "ar": "العربية",
+      "fr": "Français",
+      "en": "English"
+    }
+  },
+  "tabs": {
+    "home": "الرئيسية",
+    "properties": "العقارات",
+    "simulator": "محاكي",
+    "portfolio": "المحفظة",
+    "profile": "الملف الشخصي"
+  },
+  "screens": {
+    "homeTitle": "الرئيسية",
+    "propertiesTitle": "العقارات",
+    "simulatorTitle": "محاكي",
+    "portfolioTitle": "المحفظة",
+    "profileTitle": "الملف الشخصي"
+  }
+}

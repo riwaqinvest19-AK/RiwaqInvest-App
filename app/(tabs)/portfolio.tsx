@@ -1,22 +1,17 @@
-import { StyleSheet, Text as RNText, View as RNView } from 'react-native';
+import { StyleSheet } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import EditScreenInfo from '@/components/EditScreenInfo';
 import { Text, View } from '@/components/Themed';
 
-export default function TabOneScreen() {
+export default function PortfolioScreen() {
   const { t } = useTranslation();
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>{t('screens.homeTitle')}</Text>
-      <RNView className="mb-2 rounded-lg bg-emerald-100 px-3 py-1 dark:bg-emerald-900/40">
-        <RNText className="text-center text-sm font-semibold text-emerald-800 dark:text-emerald-200">
-          NativeWind v4
-        </RNText>
-      </RNView>
+      <Text style={styles.title}>{t('screens.portfolioTitle')}</Text>
       <View style={styles.separator} lightColor="#eee" darkColor="rgba(255,255,255,0.1)" />
-      <EditScreenInfo path="app/(tabs)/index.tsx" />
+      <EditScreenInfo path="app/(tabs)/portfolio.tsx" />
     </View>
   );
 }

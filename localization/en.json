@@ -1,0 +1,26 @@
+{
+  "language": {
+    "chooseTitle": "Choose language",
+    "sectionLabel": "Language",
+    "continue": "Continue",
+    "names": {
+      "ar": "العربية",
+      "fr": "Français",
+      "en": "English"
+    }
+  },
+  "tabs": {
+    "home": "Home",
+    "properties": "Properties",
+    "simulator": "Simulator",
+    "portfolio": "Portfolio",
+    "profile": "Profile"
+  },
+  "screens": {
+    "homeTitle": "Home",
+    "propertiesTitle": "Properties",
+    "simulatorTitle": "Simulator",
+    "portfolioTitle": "Portfolio",
+    "profileTitle": "Profile"
+  }
+}

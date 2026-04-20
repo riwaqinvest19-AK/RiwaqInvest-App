@@ -1,0 +1,26 @@
+{
+  "language": {
+    "chooseTitle": "Choisir la langue",
+    "sectionLabel": "Langue",
+    "continue": "Continuer",
+    "names": {
+      "ar": "العربية",
+      "fr": "Français",
+      "en": "English"
+    }
+  },
+  "tabs": {
+    "home": "Accueil",
+    "properties": "Biens",
+    "simulator": "Simulateur",
+    "portfolio": "Portefeuille",
+    "profile": "Profil"
+  },
+  "screens": {
+    "homeTitle": "Accueil",
+    "propertiesTitle": "Biens",
+    "simulatorTitle": "Simulateur",
+    "portfolioTitle": "Portefeuille",
+    "profileTitle": "Profil"
+  }
+}
