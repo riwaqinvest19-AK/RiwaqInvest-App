@@ -8,6 +8,7 @@
     "ios": "expo run:ios",
     "web": "expo start --web",
     "export:web": "expo export --platform web",
+    "prepare:pdf-logo": "node scripts/prepare-pdf-logo.mjs",
     "build:android": "eas build --platform android --profile production --non-interactive",
     "build:ios": "eas build --platform ios --profile production --non-interactive",
     "build:all": "eas build --platform all --profile production --non-interactive",

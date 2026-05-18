@@ -210,6 +210,15 @@ export default function ProjectDetailScreen() {
       const description =
         project.description?.trim() || t('projectDetails.documentDemoDescriptionFallback');
       const location = project.location?.trim() ?? '';
+      const expectedReturn =
+        project.expected_return != null ? Number(project.expected_return) : null;
+      const fundingGoal =
+        project.target_amount != null ? Number(project.target_amount) : null;
+      const minInv = effectiveMinInvestment(project.min_investment);
+      const durationMonths =
+        project.duration_months != null && project.duration_months > 0
+          ? project.duration_months
+          : null;
 
       void (async () => {
         try {
@@ -217,13 +226,32 @@ export default function ProjectDetailScreen() {
             title,
             description,
             location,
+            expectedReturnPct: Number.isFinite(expectedReturn) ? expectedReturn : null,
+            fundingGoal: Number.isFinite(fundingGoal) ? fundingGoal : null,
+            minInvestment: minInv > 0 ? minInv : null,
+            durationMonths,
             locale: i18n.language,
+            numberLocale,
+            currency: t('dashboard.currency'),
             labels: {
-              sheetTitle: t('projectDetails.documentDemoSheetTitle'),
+              docTitle: t('projectDetails.documentDemoSheetTitle'),
+              heading: t('projectDetails.documentDemoHeading'),
+              issuedLabel: t('portfolio.returnsPdfIssued'),
+              colItem: t('projectDetails.documentDemoColItem'),
+              colValue: t('projectDetails.documentDemoColValue'),
+              summaryTitle: t('projectDetails.documentDemoSummaryTitle'),
               previewNote: t('projectDetails.documentDemoPreviewNote'),
-              locationLabel: t('projectDetails.documentDemoLocationLabel'),
-              wordmark: t('portfolio.pdfWordmark'),
-              tagline: t('portfolio.pdfTagline'),
+              brandAlt: t('portfolio.pdfBrandAlt'),
+              footerLine: t('projectDetails.documentDemoFooter'),
+              rowProject: t('projectDetails.documentDemoRowProject'),
+              rowLocation: t('projectDetails.documentDemoLocationLabel'),
+              rowExpectedReturn: t('projectDetails.gridExpectedReturn'),
+              rowFundingGoal: t('projectDetails.gridFundingGoal'),
+              rowMinInvestment: t('projectDetails.gridMinInvestment'),
+              rowDuration: t('projectDetails.gridDuration'),
+              rowDescription: t('projectDetails.aboutSectionTitle'),
+              durationMonthsTemplate: t('projectDetails.durationMonths'),
+              expectedReturnSuffix: '%',
             },
           });
         } catch (e) {
@@ -246,7 +274,7 @@ export default function ProjectDetailScreen() {
       [{ label: t('projectDetails.documentDemoPreview'), onPress: openDemoPdf }],
       t('common.ok'),
     );
-  }, [project, t, i18n.language]);
+  }, [project, t, i18n.language, numberLocale]);
 
   const progress = project
     ? Math.min(100, Math.max(0, Number(project.investment_progress)))
