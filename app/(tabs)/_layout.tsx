@@ -1,26 +1,26 @@
 import React from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Ionicons from '@expo/vector-icons/Ionicons';
-import { Link, Tabs } from 'expo-router';
-import { Pressable } from 'react-native';
+import { Tabs, router, type Href } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 
 import Colors from '@/constants/Colors';
 import { useColorScheme } from '@/components/useColorScheme';
-import { useClientOnlyValue } from '@/components/useClientOnlyValue';
+
+const BRAND_NAVY = '#154375';
 
 function TabBarIconFA(props: {
   name: React.ComponentProps<typeof FontAwesome>['name'];
   color: string;
 }) {
-  return <FontAwesome size={26} style={{ marginBottom: -2 }} {...props} />;
+  return <FontAwesome size={24} style={{ marginBottom: -2 }} {...props} />;
 }
 
 function TabBarIconIon(props: {
   name: React.ComponentProps<typeof Ionicons>['name'];
   color: string;
 }) {
-  return <Ionicons size={26} style={{ marginBottom: -2 }} {...props} />;
+  return <Ionicons size={24} style={{ marginBottom: -2 }} {...props} />;
 }
 
 export default function TabLayout() {
@@ -30,28 +30,22 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        tabBarActiveTintColor: Colors[colorScheme ?? 'light'].tint,
-        headerShown: useClientOnlyValue(false, true),
+        headerShown: false,
+        tabBarActiveTintColor: BRAND_NAVY,
+        tabBarInactiveTintColor: Colors[colorScheme ?? 'light'].tabIconDefault,
+        tabBarStyle: {
+          backgroundColor: '#fff',
+          borderTopWidth: 1,
+          borderTopColor: '#E8ECF0',
+        },
       }}>
       <Tabs.Screen
         name="index"
         options={{
           title: t('screens.homeTitle'),
           tabBarLabel: t('tabs.home'),
-          tabBarIcon: ({ color }) => <TabBarIconIon name="home-outline" color={color} />,
-          headerRight: () => (
-            <Link href="/modal" asChild>
-              <Pressable>
-                {({ pressed }) => (
-                  <FontAwesome
-                    name="info-circle"
-                    size={25}
-                    color={Colors[colorScheme ?? 'light'].text}
-                    style={{ marginEnd: 15, opacity: pressed ? 0.5 : 1 }}
-                  />
-                )}
-              </Pressable>
-            </Link>
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIconIon name={focused ? 'business' : 'business-outline'} color={color} />
           ),
         }}
       />
@@ -60,7 +54,19 @@ export default function TabLayout() {
         options={{
           title: t('screens.propertiesTitle'),
           tabBarLabel: t('tabs.properties'),
-          tabBarIcon: ({ color }) => <TabBarIconIon name="business-outline" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIconIon name={focused ? 'location' : 'location-outline'} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="portfolio"
+        options={{
+          title: t('screens.portfolioTitle'),
+          tabBarLabel: t('tabs.portfolio'),
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIconIon name={focused ? 'pie-chart' : 'pie-chart-outline'} color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -72,19 +78,19 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="portfolio"
-        options={{
-          title: t('screens.portfolioTitle'),
-          tabBarLabel: t('tabs.portfolio'),
-          tabBarIcon: ({ color }) => <TabBarIconFA name="briefcase" color={color} />,
-        }}
-      />
-      <Tabs.Screen
         name="profile"
         options={{
           title: t('screens.profileTitle'),
           tabBarLabel: t('tabs.profile'),
-          tabBarIcon: ({ color }) => <TabBarIconIon name="person-circle-outline" color={color} />,
+          tabBarIcon: ({ color, focused }) => (
+            <TabBarIconIon name={focused ? 'person-circle' : 'person-circle-outline'} color={color} />
+          ),
+        }}
+        listeners={{
+          tabPress: (e) => {
+            e.preventDefault();
+            router.navigate('/(tabs)/profile' as Href);
+          },
         }}
       />
     </Tabs>

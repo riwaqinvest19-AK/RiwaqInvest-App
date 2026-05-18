@@ -11,6 +11,9 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { STORAGE_KEYS } from '@/lib/storageKeys';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
 type AppLanguage = 'ar' | 'fr' | 'en';
 
 const LANGUAGES: AppLanguage[] = ['ar', 'fr', 'en'];
@@ -37,14 +40,16 @@ export default function LanguageScreen() {
   const onSelectLanguage = useCallback(
     (langCode: AppLanguage) => {
       setSelected(langCode);
+      void AsyncStorage.setItem(STORAGE_KEYS.language, langCode);
       void i18n.changeLanguage(langCode);
     },
     [i18n],
   );
 
   const onContinue = useCallback(async () => {
+    await AsyncStorage.setItem(STORAGE_KEYS.language, selected);
     await i18n.changeLanguage(selected);
-    router.replace('/(tabs)');
+    router.replace('/onboarding');
   }, [router, selected, i18n]);
 
   if (!fontsLoaded) {

@@ -2,28 +2,53 @@
   "expo": {
     "name": "Riwaq Invest",
     "slug": "riwaq-invest",
-    "version": "1.0.0",
+    "version": "1.0.1",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/6e117e02-97e5-40f7-b544-3af7e18dec27",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0
+    },
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "riwaqinvest",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/logo-riwaq.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#FFFFFF"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.riwaq.invest",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow Riwaq Invest to use the camera for identity verification selfies.",
+        "NSPhotoLibraryUsageDescription": "Allow Riwaq Invest to choose photos from your gallery for identity verification.",
+        "NSPhotoLibraryAddUsageDescription": "Allow Riwaq Invest to save verification photos when needed.",
+        "LSApplicationQueriesSchemes": ["whatsapp", "mailto", "tel"],
+        "ITSAppUsesNonExemptEncryption": false
+      }
     },
     "android": {
-      "supportsRTL": true,
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
+      "softwareKeyboardLayoutMode": "resize",
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE"
+      ],
+      "package": "com.anonymous.riwaqinvest"
     },
     "web": {
       "bundler": "metro",
@@ -31,10 +56,57 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/images/logo-riwaq.png",
+          "resizeMode": "contain",
+          "backgroundColor": "#FFFFFF"
+        }
+      ],
+      [
+        "expo-font",
+        {
+          "fonts": [
+            "./assets/fonts/icons/Ionicons.ttf",
+            "./assets/fonts/icons/MaterialIcons.ttf",
+            "./assets/fonts/icons/FontAwesome.ttf",
+            "./assets/fonts/icons/MaterialCommunityIcons.ttf"
+          ]
+        }
+      ],
+      "expo-router",
+      "expo-secure-store",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow Riwaq Invest to use the camera for verification selfies."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#154375"
+        }
+      ],
+      "expo-web-browser",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Riwaq Invest to use Face ID for secure sign-in."
+        }
+      ],
+      "expo-updates"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "6e117e02-97e5-40f7-b544-3af7e18dec27"
+      }
     }
   }
 }

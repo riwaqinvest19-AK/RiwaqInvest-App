@@ -1,0 +1,21 @@
+# Minimal Supabase CLI config — extend via `supabase init` if needed.
+# https://supabase.com/docs/guides/cli/config
+
+project_id = "riwaqinvest"
+
+# Auth: require email confirmation before dashboard access (enable same in Supabase Dashboard → Auth).
+[auth]
+enabled = true
+site_url = "riwaqinvest://"
+additional_redirect_urls = ["riwaqinvest://", "exp://**", "http://localhost:**"]
+enable_signup = true
+enable_confirmations = true
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = true
+
+[functions.investor-chatbot]
+# App sends `Authorization: Bearer <EXPO_PUBLIC_SUPABASE_ANON_KEY>` (see lib/chatbotReply.ts).
+verify_jwt = true

@@ -25,13 +25,20 @@ function applyLayoutDirection(lng: string) {
     return;
   }
 
-  I18nManager.allowRTL(true);
-  if (I18nManager.isRTL !== rtl) {
-    I18nManager.forceRTL(rtl);
-  }
-}
+  const applyNative = () => {
+    I18nManager.allowRTL(true);
+    if (I18nManager.isRTL !== rtl) {
+      I18nManager.forceRTL(rtl);
+    }
+  };
 
-applyLayoutDirection(DEFAULT_LANGUAGE);
+  // Defer: calling forceRTL synchronously during the first module evaluation can
+  // destabilize Expo/Metro and leave the client stuck (e.g. "Building 100%"/reload).
+  if (Platform.OS === 'web') {
+    return;
+  }
+  setTimeout(applyNative, 0);
+}
 
 i18n.use(initReactI18next).init(
   {

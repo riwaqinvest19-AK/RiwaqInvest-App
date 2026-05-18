@@ -1,0 +1,12 @@
+[build]
+  command = "npm run export:web"
+  publish = "dist"
+
+# Required in Netlify UI → Site settings → Environment variables (before deploy):
+# EXPO_PUBLIC_SUPABASE_URL
+# EXPO_PUBLIC_SUPABASE_ANON_KEY
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
