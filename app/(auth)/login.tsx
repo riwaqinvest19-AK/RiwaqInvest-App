@@ -23,6 +23,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LabeledField } from '@/components/auth/LabeledField';
 import { RiwaqLogo } from '@/components/RiwaqLogo';
+import { ANDROID_APK_URL } from '@/constants/AppDownload';
 import {
   authenticateWithBiometrics,
   biometricI18nSuffix,
@@ -358,6 +359,30 @@ export default function LoginScreen() {
             <Text className="font-cairo-bold text-lg text-white">{t('auth.loginButton')}</Text>
           )}
         </Pressable>
+
+        {Platform.OS === 'web' ? (
+          <Pressable
+            accessibilityRole="link"
+            accessibilityLabel={t('auth.downloadApp')}
+            onPress={() => {
+              if (typeof window !== 'undefined') {
+                window.open(ANDROID_APK_URL, '_blank', 'noopener,noreferrer');
+              }
+            }}
+            className="mt-4 h-14 w-full flex-row-reverse items-center justify-center gap-3 rounded-2xl bg-accent-gold px-4 active:opacity-90"
+            style={{ cursor: 'pointer' }}>
+            <MaterialIcons name="download" size={26} color="#154375" />
+            <View className="items-center">
+              <Text className="font-cairo-bold text-lg text-brand-navy">
+                {t('auth.downloadApp')}
+              </Text>
+              <Text className="font-cairo text-xs text-brand-navy/80">
+                {t('auth.downloadAppHint')}
+              </Text>
+            </View>
+            <MaterialIcons name="android" size={26} color="#154375" />
+          </Pressable>
+        ) : null}
 
         <View className="mt-6 flex-row flex-wrap items-center justify-center">
           <Text className="text-center font-cairo text-sm text-gray-600">

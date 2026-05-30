@@ -5,6 +5,7 @@
 # Required in Netlify UI → Site settings → Environment variables (before deploy):
 # EXPO_PUBLIC_SUPABASE_URL
 # EXPO_PUBLIC_SUPABASE_ANON_KEY
+# EXPO_PUBLIC_ANDROID_APK_URL=https://github.com/riwaqinvest19-AK/RiwaqInvest-App/releases/download/v1.0.1/RiwaqInvest_v1.0.1.apk
 
 [[redirects]]
   from = "/*"

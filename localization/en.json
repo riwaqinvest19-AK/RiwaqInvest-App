@@ -91,7 +91,9 @@
     "signOut": "Sign out",
     "signOutConfirmTitle": "Sign out?",
     "signOutConfirmMessage": "You will need to sign in again to access your account.",
-    "alertCancel": "Cancel"
+    "alertCancel": "Cancel",
+    "downloadApp": "Download app",
+    "downloadAppHint": "Android APK — permanent link"
   },
   "screens": {
     "homeTitle": "Home",

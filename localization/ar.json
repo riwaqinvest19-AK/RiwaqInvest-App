@@ -91,7 +91,9 @@
     "signOut": "تسجيل الخروج",
     "signOutConfirmTitle": "تسجيل الخروج؟",
     "signOutConfirmMessage": "ستحتاج لتسجيل الدخول مجدداً للوصول إلى حسابك.",
-    "alertCancel": "إلغاء"
+    "alertCancel": "إلغاء",
+    "downloadApp": "تحميل التطبيق",
+    "downloadAppHint": "نسخة أندرويد (APK) — رابط دائم"
   },
   "screens": {
     "homeTitle": "الرئيسية",

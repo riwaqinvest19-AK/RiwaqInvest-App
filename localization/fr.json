@@ -91,7 +91,9 @@
     "signOut": "Se déconnecter",
     "signOutConfirmTitle": "Se déconnecter ?",
     "signOutConfirmMessage": "Vous devrez vous reconnecter pour accéder à votre compte.",
-    "alertCancel": "Annuler"
+    "alertCancel": "Annuler",
+    "downloadApp": "Télécharger l'application",
+    "downloadAppHint": "APK Android — lien permanent"
   },
   "screens": {
     "homeTitle": "Accueil",
