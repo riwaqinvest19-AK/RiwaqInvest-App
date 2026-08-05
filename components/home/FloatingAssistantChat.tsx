@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type FaqChatEntry, getAssistantReply } from '@/lib/chatbotReply';
+import { type FaqChatEntry, getInstantAssistantReply } from '@/lib/chatbotReply';
 
 type Msg = { id: string; role: 'user' | 'assistant'; text: string };
 
@@ -57,23 +57,53 @@ export function FloatingAssistantChat() {
 
   const displayMsgs = msgs.length === 0 ? [welcome] : msgs;
 
-  const send = useCallback(async () => {
-    const q = input.trim();
-    if (!q || busy) return;
-    setInput('');
-    const userMsg: Msg = { id: `u_${Date.now()}`, role: 'user', text: q };
-    setMsgs((m) => [...m, userMsg]);
-    setBusy(true);
-    try {
-      const reply = await getAssistantReply(q, i18n.language, faqItems);
+  const smartCtx = useMemo(
+    () => ({ topUpReply: t('dashboard.chatbotReplyTopUp') }),
+    [t],
+  );
+
+  const quickQuestions = useMemo(
+    () => [
+      t('dashboard.chatbotQuickInvest'),
+      t('dashboard.chatbotQuickReturns'),
+      t('dashboard.chatbotQuickTopUp'),
+      t('dashboard.chatbotQuickVerify'),
+    ],
+    [t],
+  );
+
+  const pushAssistantReply = useCallback(
+    (question: string) => {
+      const reply =
+        getInstantAssistantReply(question, faqItems, smartCtx) || t('dashboard.chatbotFallback');
       setMsgs((m) => [
         ...m,
-        { id: `a_${Date.now()}`, role: 'assistant', text: reply || t('dashboard.chatbotFallback') },
+        { id: `a_${Date.now()}`, role: 'assistant', text: reply },
       ]);
-    } finally {
-      setBusy(false);
-    }
-  }, [busy, faqItems, i18n.language, input, t]);
+    },
+    [faqItems, smartCtx, t],
+  );
+
+  const sendQuestion = useCallback(
+    async (question: string) => {
+      const q = question.trim();
+      if (!q || busy) return;
+      setInput('');
+      const userMsg: Msg = { id: `u_${Date.now()}`, role: 'user', text: q };
+      setMsgs((m) => [...m, userMsg]);
+      setBusy(true);
+      try {
+        pushAssistantReply(q);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, pushAssistantReply],
+  );
+
+  const send = useCallback(async () => {
+    await sendQuestion(input);
+  }, [input, sendQuestion]);
 
   const goFaq = useCallback(() => {
     setOpen(false);
@@ -142,6 +172,21 @@ export function FloatingAssistantChat() {
                   keyboardDismissMode="on-drag"
                   contentContainerStyle={{ padding: 16, gap: 10, flexGrow: 1 }}
                   onContentSizeChange={() => listRef.current?.scrollToEnd({ animated: true })}
+                  ListFooterComponent={
+                    !busy ? (
+                      <View className="mt-2 flex-row flex-wrap gap-2" style={{ justifyContent: 'flex-end' }}>
+                        {quickQuestions.map((label) => (
+                          <Pressable
+                            key={label}
+                            accessibilityRole="button"
+                            onPress={() => void sendQuestion(label)}
+                            className="rounded-full border border-brand-navy/25 bg-white px-3 py-1.5 active:opacity-80">
+                            <Text className="font-cairo text-xs text-brand-navy">{label}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    ) : null
+                  }
                   renderItem={({ item }) => (
                     <View
                       className={`max-w-[90%] rounded-2xl px-3 py-2.5 ${

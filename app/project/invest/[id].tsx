@@ -27,6 +27,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type ProjectRow, cardShadow } from '@/components/projects/ProjectCard';
+import { PaymentDetailsPanel } from '@/components/payments/PaymentDetailsPanel';
 import { effectiveMinInvestment } from '@/constants/Investment';
 import { handleInvestment } from '@/lib/investInProject';
 import { notifyInvestmentSuccessLocal } from '@/lib/pushNotifications';
@@ -544,6 +545,15 @@ export default function InvestScreen() {
                   />
                 ) : (
                   <>
+                    {(payMethod === 'transfer' || payMethod === 'ccp') && (
+                      <View className="mt-4">
+                        <PaymentDetailsPanel
+                          variant="light"
+                          showRip={payMethod === 'ccp'}
+                        />
+                      </View>
+                    )}
+
                     <View className="mt-6 rounded-2xl bg-[#E8ECF1] p-4">
                       <Text className="mb-3 text-right font-cairo-bold text-sm text-neutral-900">
                         {t('invest.summaryTitle')}

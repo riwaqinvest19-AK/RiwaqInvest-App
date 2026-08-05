@@ -1,5 +1,9 @@
 export type FaqChatEntry = { question: string; answer: string };
 
+export type SmartReplyContext = {
+  topUpReply?: string;
+};
+
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -27,11 +31,82 @@ function scoreQuestion(userMsg: string, faq: FaqChatEntry): number {
   return score;
 }
 
-function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string {
+type TopicRule = {
+  id: string;
+  patterns: RegExp[];
+  pick: (faqItems: FaqChatEntry[], ctx: SmartReplyContext) => string;
+};
+
+function buildTopicRules(ctx: SmartReplyContext): TopicRule[] {
+  return [
+    {
+      id: 'topup',
+      patterns: [
+        /شحن|محفظ|رصيد|تحويل|ccp|rip|rib|virement|recharge|top.?up|fund|wallet|deposit|alimenter|crediter/u,
+      ],
+      pick: (_faq, c) =>
+        c.topUpReply ??
+        'Use bank transfer or CCP Algeria Post from the payment screen. Account: Riwaq Invest SARL — BNA Agence Alger Centre.',
+    },
+    {
+      id: 'returns',
+      patterns: [
+        /ربح|ارباح|عائد|عوائد|return|profit|rendement|gain|roi|interest|yield/u,
+      ],
+      pick: (faq) => {
+        const invest = faq.find((x) => /invest|استثمار|investir/i.test(x.question));
+        const min = faq.find((x) => /minimum|ادنى|minimum/i.test(x.question));
+        return [invest?.answer, min?.answer].filter(Boolean).join('\n\n');
+      },
+    },
+    {
+      id: 'invest',
+      patterns: [
+        /استثمار|استثمر|invest|investir|projet|project|portfolio|محفظ|amount|مبلغ/u,
+      ],
+      pick: (faq) => {
+        const start = faq[0];
+        const min = faq.find((x) => /minimum|ادنى|minimum/i.test(x.question));
+        return [start?.answer, min?.answer].filter(Boolean).join('\n\n');
+      },
+    },
+    {
+      id: 'verify',
+      patterns: [
+        /وثق|توثيق|verify|verification|kyc|identity|identite|هوية|حساب/u,
+      ],
+      pick: (faq) => faq.find((x) => /verify|وثق|verification/i.test(x.question))?.answer ?? faq[2]?.answer ?? '',
+    },
+  ];
+}
+
+function matchTopicReply(
+  userMessage: string,
+  faqItems: FaqChatEntry[],
+  ctx: SmartReplyContext,
+): string | null {
+  const lower = normalize(userMessage);
+  for (const rule of buildTopicRules(ctx)) {
+    if (rule.patterns.some((re) => re.test(lower))) {
+      const reply = rule.pick(faqItems, ctx).trim();
+      if (reply) return reply;
+    }
+  }
+  return null;
+}
+
+function localFaqAnswer(
+  userMessage: string,
+  faqItems: FaqChatEntry[],
+  ctx: SmartReplyContext,
+): string {
   const trimmed = userMessage.trim();
   if (!trimmed) {
     return faqItems[0]?.answer ?? '';
   }
+
+  const topicReply = matchTopicReply(trimmed, faqItems, ctx);
+  if (topicReply) return topicReply;
 
   let best: FaqChatEntry | null = null;
   let bestScore = 0;
@@ -43,29 +118,21 @@ function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string {
     }
   }
 
-  if (best && bestScore >= 3) {
-    return `${best.answer}\n\n(${best.question})`;
-  }
-
-  if (best && bestScore > 0) {
-    return best.answer;
+  if (best && bestScore >= 2) {
+    return bestScore >= 3 ? `${best.answer}\n\n(${best.question})` : best.answer;
   }
 
   const lower = normalize(trimmed);
-  if (/(hello|hi|salam|مرحبا|bonjour)/u.test(lower)) {
+  if (/(hello|hi|salam|مرحب|bonjour|ahlan|assalam)/u.test(lower)) {
     return faqItems[0]?.answer ?? '';
   }
-  if (/(new|جديد|debut|start|ابدأ)/u.test(lower)) {
+  if (/(new|جديد|debut|start|ابد|commencer|debuter)/u.test(lower)) {
     const intro = faqItems[0];
     const invest = faqItems.find((x) => /invest|استثمار|investir/i.test(x.question));
     return [intro?.answer, invest?.answer].filter(Boolean).join('\n\n');
   }
 
-  return (
-    faqItems[2]?.answer ??
-    faqItems[0]?.answer ??
-    ''
-  );
+  return faqItems[0]?.answer ?? faqItems[2]?.answer ?? '';
 }
 
 export type ChatbotApiPayload = {
@@ -74,37 +141,50 @@ export type ChatbotApiPayload = {
   faq: FaqChatEntry[];
 };
 
+/** Instant smart reply — local FAQ + topic rules (no network wait). */
+export function getInstantAssistantReply(
+  userMessage: string,
+  faqItems: FaqChatEntry[],
+  ctx: SmartReplyContext = {},
+): string {
+  return localFaqAnswer(userMessage, faqItems, ctx);
+}
+
 export async function getAssistantReply(
   userMessage: string,
   locale: string,
   faqItems: FaqChatEntry[],
+  ctx: SmartReplyContext = {},
 ): Promise<string> {
+  const local = getInstantAssistantReply(userMessage, faqItems, ctx);
   const apiUrl = process.env.EXPO_PUBLIC_CHATBOT_API_URL?.trim();
-  if (apiUrl) {
-    try {
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Accept-Language': locale,
-      };
-      const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
-      if (anon && /supabase\.co\/functions\/v1\//i.test(apiUrl)) {
-        headers.Authorization = `Bearer ${anon}`;
-        headers.apikey = anon;
-      }
-      const res = await fetch(apiUrl, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ message: userMessage, locale, faq: faqItems } satisfies ChatbotApiPayload),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { reply?: string };
-        if (data?.reply && typeof data.reply === 'string') {
-          return data.reply.trim();
-        }
-      }
-    } catch {
-      /* fall back */
-    }
+  if (!apiUrl) {
+    return local;
   }
-  return localFaqAnswer(userMessage, faqItems);
+
+  try {
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept-Language': locale,
+    };
+    const anon = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY?.trim();
+    if (anon && /supabase\.co\/functions\/v1\//i.test(apiUrl)) {
+      headers.Authorization = `Bearer ${anon}`;
+      headers.apikey = anon;
+    }
+    const res = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ message: userMessage, locale, faq: faqItems } satisfies ChatbotApiPayload),
+    });
+    if (res.ok) {
+      const data = (await res.json()) as { reply?: string };
+      if (data?.reply && typeof data.reply === 'string') {
+        return data.reply.trim();
+      }
+    }
+  } catch {
+    /* fall back */
+  }
+  return local;
 }

@@ -128,6 +128,11 @@
     "chatbotWelcome": "Bonjour ! Posez vos questions sur l’investissement, les rendements ou la vérification — je m’appuie sur la FAQ.",
     "chatbotPlaceholder": "Votre question…",
     "chatbotFallback": "Je n’ai pas trouvé de réponse dans la FAQ. Ouvrez la page d’aide ou reformulez votre question.",
+    "chatbotQuickInvest": "Comment investir ?",
+    "chatbotQuickReturns": "Comment sont calculés les rendements ?",
+    "chatbotQuickTopUp": "Comment recharger mon portefeuille ?",
+    "chatbotQuickVerify": "Comment vérifier mon compte ?",
+    "chatbotReplyTopUp": "Pour créditer votre portefeuille : choisissez Virement bancaire ou CCP Algérie Poste à l’écran de paiement ou depuis le profil. Riwaq Invest SARL — BNA Agence Alger Centre. RIB : 007 99000 1234567890 12 | RIP : 007999999912. Le solde est crédité après confirmation du virement.",
     "pushReturnsTitle": "Portefeuille crédité",
     "pushReturnsBody": "+{{amount}} DZD ajoutés à votre solde."
   },
@@ -351,6 +356,17 @@
     "withdrawFullBalance": "Retirer le solde total",
     "withdrawComingSoonTitle": "Riwaq Invest",
     "withdrawComingSoonMessage": "Cette fonctionnalité sera disponible dans la prochaine mise à jour, une fois le rattachement bancaire finalisé."
+  },
+  "wallet": {
+    "paymentDetailsTitle": "Coordonnées de virement",
+    "paymentDetailsSubtitleBank": "Utilisez ces informations pour un virement bancaire (RIB) afin de créditer votre portefeuille.",
+    "paymentDetailsSubtitleCcp": "Utilisez ces informations pour un virement CCP-RIP (Algérie Poste) afin de créditer votre portefeuille.",
+    "accountHolder": "Titulaire du compte",
+    "bankName": "Banque",
+    "ribNumber": "Numéro RIB bancaire",
+    "ripNumber": "Numéro RIP postal",
+    "copySuccess": "Copié",
+    "fundWalletHint": "Pour alimenter votre solde, effectuez un virement via l’une des options ci-dessous et contactez le support si besoin."
   },
   "profile": {
     "fallbackName": "Utilisateur",

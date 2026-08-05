@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Animated, Easing, Text, View } from 'react-native';
 import Svg, {
-  ClipPath,
   Defs,
   G,
   Line,
   LinearGradient,
   Path,
-  Rect,
   Stop,
   Text as SvgText,
 } from 'react-native-svg';
@@ -46,8 +44,20 @@ export function GrowthChart({
   const innerW = Math.max(0, w - padL - padR);
   const innerH = H - padT - padB;
 
+  const chartPoints = useMemo(() => {
+    if (series.length === 0) return [];
+    if (series.length === 1) {
+      const only = series[0];
+      return [
+        { month: only.month, value: only.value },
+        { month: Math.max(only.month + 1, 1), value: only.value },
+      ];
+    }
+    return series;
+  }, [series]);
+
   const { linePath, areaPath, yTicks, xLabels, maxY } = useMemo(() => {
-    if (series.length < 2 || innerW <= 0 || innerH <= 0) {
+    if (chartPoints.length < 2 || innerW <= 0 || innerH <= 0) {
       return {
         linePath: '',
         areaPath: '',
@@ -56,27 +66,28 @@ export function GrowthChart({
         maxY: 1,
       };
     }
-    const last = series[series.length - 1];
+    const last = chartPoints[chartPoints.length - 1];
     const lastMonth = Math.max(1, last.month);
-    const maxVal = Math.max(...series.map((p) => p.value), 1);
-    const maxYAxis = maxVal * 1.08;
+    const minVal = Math.min(...chartPoints.map((p) => p.value));
+    const maxVal = Math.max(...chartPoints.map((p) => p.value), minVal + 1);
+    const maxYAxis = maxVal === minVal ? maxVal * 1.08 : maxVal * 1.08;
     const yTicks = [0, maxYAxis * 0.5, maxYAxis];
     const toX = (month: number) => padL + (month / lastMonth) * innerW;
     const toY = (value: number) =>
       padT + innerH - (value / maxYAxis) * innerH;
 
     let dLine = '';
-    series.forEach((pt, i) => {
+    chartPoints.forEach((pt, i) => {
       const x = toX(pt.month);
       const y = toY(pt.value);
       dLine += i === 0 ? `M ${x} ${y}` : ` L ${x} ${y}`;
     });
 
-    const firstX = toX(series[0].month);
+    const firstX = toX(chartPoints[0].month);
     const lastX = toX(last.month);
     const baseY = padT + innerH;
     let dArea = `M ${firstX} ${baseY}`;
-    series.forEach((pt) => {
+    chartPoints.forEach((pt) => {
       dArea += ` L ${toX(pt.month)} ${toY(pt.value)}`;
     });
     dArea += ` L ${lastX} ${baseY} Z`;
@@ -92,7 +103,7 @@ export function GrowthChart({
     }
 
     return { linePath: dLine, areaPath: dArea, yTicks, xLabels, maxY: maxYAxis };
-  }, [series, innerW, innerH]);
+  }, [chartPoints, innerW, innerH]);
 
   useEffect(() => {
     if (!linePath || !areaPath || innerW <= 0 || innerH <= 0) return;
@@ -100,34 +111,29 @@ export function GrowthChart({
     reveal.setValue(0);
     Animated.timing(reveal, {
       toValue: 1,
-      duration: 1500,
+      duration: 900,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false, // animating SVG width
+      useNativeDriver: true,
     }).start();
-  }, [areaPath, innerH, innerW, linePath, reveal, series]);
+  }, [areaPath, innerH, innerW, linePath, reveal, chartPoints]);
 
-  const AnimatedRect = useMemo(() => Animated.createAnimatedComponent(Rect), []);
+  const chartOpacity = reveal.interpolate({
+    inputRange: [0, 1],
+    outputRange: [0.15, 1],
+  });
+
+  const AnimatedView = useMemo(() => Animated.createAnimatedComponent(View), []);
 
   return (
     <View className="w-full" onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
-      {w >= 60 ? (
+      {w >= 60 && linePath ? (
+        <AnimatedView style={{ opacity: chartOpacity }}>
         <Svg width={w} height={H}>
           <Defs>
             <LinearGradient id="simAreaGrad" x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0" stopColor={AREA_TOP} stopOpacity={0.32} />
               <Stop offset="1" stopColor={AREA_BOTTOM} stopOpacity={0.06} />
             </LinearGradient>
-            <ClipPath id="simRevealClip">
-              <AnimatedRect
-                x={padL}
-                y={padT}
-                height={innerH}
-                width={reveal.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: [0, innerW],
-                })}
-              />
-            </ClipPath>
           </Defs>
 
           {yTicks.map((tick, i) => {
@@ -145,9 +151,9 @@ export function GrowthChart({
             );
           })}
 
-          <G clipPath="url(#simRevealClip)">
+          <G>
             <Path d={areaPath} fill="url(#simAreaGrad)" />
-            <Path d={linePath} stroke={BRAND} strokeWidth={2.5} fill="none" />
+            <Path d={linePath} stroke={BRAND} strokeWidth={2.5} fill="none" strokeLinecap="round" strokeLinejoin="round" />
           </G>
 
           {yTicks.map((tick, i) => {
@@ -177,6 +183,7 @@ export function GrowthChart({
             </SvgText>
           ))}
         </Svg>
+        </AnimatedView>
       ) : null}
 
       <View className="mt-2 flex-row items-center gap-2 px-1">

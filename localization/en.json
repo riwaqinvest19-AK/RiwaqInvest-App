@@ -128,6 +128,11 @@
     "chatbotWelcome": "Hello! Ask about investing, returns, or verification — I answer from the FAQ and can point you to detailed help.",
     "chatbotPlaceholder": "Type your question…",
     "chatbotFallback": "I could not match that to our FAQ. Try opening the FAQ page or rephrase your question.",
+    "chatbotQuickInvest": "How do I invest?",
+    "chatbotQuickReturns": "How are returns calculated?",
+    "chatbotQuickTopUp": "How do I top up my wallet?",
+    "chatbotQuickVerify": "How do I verify my account?",
+    "chatbotReplyTopUp": "To fund your wallet: choose Bank transfer or CCP Algeria Post on the payment screen or from your profile. Use Riwaq Invest SARL — BNA Agence Alger Centre. RIB: 007 99000 1234567890 12 | RIP: 007999999912. Balance is credited after transfer confirmation.",
     "pushReturnsTitle": "Wallet credited",
     "pushReturnsBody": "+{{amount}} DZD added to your balance."
   },
@@ -351,6 +356,17 @@
     "withdrawFullBalance": "Withdraw full balance",
     "withdrawComingSoonTitle": "Riwaq Invest",
     "withdrawComingSoonMessage": "This feature will be available in the next update once bank linking is complete."
+  },
+  "wallet": {
+    "paymentDetailsTitle": "Transfer details",
+    "paymentDetailsSubtitleBank": "Use these details for a bank transfer (RIB) to fund your wallet.",
+    "paymentDetailsSubtitleCcp": "Use these details for an Algeria Post CCP-RIP transfer to fund your wallet.",
+    "accountHolder": "Account holder",
+    "bankName": "Bank name",
+    "ribNumber": "Bank RIB number",
+    "ripNumber": "Postal RIP number",
+    "copySuccess": "Copied",
+    "fundWalletHint": "To add funds, transfer via one of the options below and contact support if needed."
   },
   "profile": {
     "fallbackName": "User",
