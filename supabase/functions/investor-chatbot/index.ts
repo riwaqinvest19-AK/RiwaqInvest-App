@@ -2,12 +2,9 @@
  * Riwaq Invest — Investor chatbot (Supabase Edge Function).
  *
  * Deploy: `supabase functions deploy investor-chatbot --no-verify-jwt`
- *   (or set verify_jwt true and call with `Authorization: Bearer <anon key>` from the app.)
- *
- * Optional secret (Dashboard → Edge Functions → Secrets):
- *   OPENAI_API_KEY — if set, replies use OpenAI with FAQ as context; otherwise FAQ heuristics only.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { assistantKnowledgeAsFaq, matchAssistantKnowledge } from "./knowledge.ts";
 
 type FaqEntry = { question: string; answer: string };
 type Payload = { message?: string; locale?: string; faq?: FaqEntry[] };
@@ -23,59 +20,6 @@ function json(body: unknown, status = 200): Response {
     status,
     headers: { ...cors, "Content-Type": "application/json; charset=utf-8" },
   });
-}
-
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9\u0600-\u06FF\s]/gi, " ")
-    .trim();
-}
-
-function tokenize(s: string): Set<string> {
-  const n = normalize(s);
-  const parts = n.split(/\s+/).filter((w) => w.length > 2);
-  return new Set(parts);
-}
-
-function scoreQuestion(userMsg: string, faq: FaqEntry): number {
-  const u = tokenize(userMsg);
-  const q = tokenize(faq.question);
-  const a = tokenize(faq.answer);
-  let score = 0;
-  for (const w of u) {
-    if (q.has(w)) score += 3;
-    if (a.has(w)) score += 1;
-  }
-  return score;
-}
-
-function faqFallbackReply(userMessage: string, faqItems: FaqEntry[]): string {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return faqItems[0]?.answer ?? "";
-
-  let best: FaqEntry | null = null;
-  let bestScore = 0;
-  for (const item of faqItems) {
-    const s = scoreQuestion(trimmed, item);
-    if (s > bestScore) {
-      bestScore = s;
-      best = item;
-    }
-  }
-  if (best && bestScore >= 3) return `${best.answer}\n\n(${best.question})`;
-  if (best && bestScore > 0) return best.answer;
-
-  const lower = normalize(trimmed);
-  if (/(hello|hi|salam|مرحبا|bonjour)/u.test(lower)) return faqItems[0]?.answer ?? "";
-  if (/(new|جديد|debut|start|ابدأ)/u.test(lower)) {
-    const intro = faqItems[0];
-    const invest = faqItems.find((x) => /invest|استثمار|investir/i.test(x.question));
-    return [intro?.answer, invest?.answer].filter(Boolean).join("\n\n");
-  }
-  return faqItems[2]?.answer ?? faqItems[0]?.answer ?? "";
 }
 
 function buildFaqContext(faq: FaqEntry[], maxChars: number): string {
@@ -96,7 +40,7 @@ async function openAiReply(
 ): Promise<string | null> {
   const faqText = buildFaqContext(faq, 12000);
   const system = `You are Riwaq Invest's concise assistant for retail investors. Language: prefer ${locale}. 
-Use ONLY the FAQ knowledge below for factual claims; if something is not covered, say you are not sure and suggest contacting support or reading the in-app FAQ.
+Use ONLY the FAQ knowledge below for factual claims; if something is not covered, say you are not sure and suggest contacting support.
 Keep answers short (under 180 words), friendly, and practical. No investment advice that guarantees returns.
 
 FAQ knowledge:
@@ -149,21 +93,15 @@ Deno.serve(async (req: Request) => {
 
   const message = typeof payload.message === "string" ? payload.message : "";
   const locale = typeof payload.locale === "string" ? payload.locale : "en";
-  const faq = Array.isArray(payload.faq)
-    ? payload.faq.filter(
-        (x): x is FaqEntry =>
-          x != null &&
-          typeof x.question === "string" &&
-          typeof x.answer === "string",
-      )
-    : [];
+  const faq = assistantKnowledgeAsFaq();
 
   if (!message.trim()) {
     return json({ reply: faq[0]?.answer ?? "" });
   }
 
-  if (faq.length === 0) {
-    return json({ reply: "No FAQ context was sent." }, 200);
+  const knowledgeHit = matchAssistantKnowledge(message);
+  if (knowledgeHit) {
+    return json({ reply: knowledgeHit });
   }
 
   const openaiKey = Deno.env.get("OPENAI_API_KEY")?.trim();
@@ -172,6 +110,5 @@ Deno.serve(async (req: Request) => {
     if (ai) return json({ reply: ai });
   }
 
-  const reply = faqFallbackReply(message, faq);
-  return json({ reply });
+  return json({ reply: faq[0]?.answer ?? "" });
 });

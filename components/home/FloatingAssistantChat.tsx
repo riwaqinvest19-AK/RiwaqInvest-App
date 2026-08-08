@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type FaqChatEntry, getInstantAssistantReply, getQuickChipReply } from '@/lib/chatbotReply';
+import { getInstantAssistantReply } from '@/lib/chatbotReply';
 
 type Msg = { id: string; role: 'user' | 'assistant'; text: string };
 
@@ -34,17 +34,6 @@ export function FloatingAssistantChat() {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [busy, setBusy] = useState(false);
   const listRef = useRef<FlatList<Msg>>(null);
-
-  const faqItems: FaqChatEntry[] = useMemo(
-    () => [
-      { question: t('profile.faqQ1'), answer: t('profile.faqA1') },
-      { question: t('profile.faqQ2'), answer: t('profile.faqA2') },
-      { question: t('profile.faqQ3'), answer: t('profile.faqA3') },
-      { question: t('profile.faqQ4'), answer: t('profile.faqA4') },
-      { question: t('profile.faqQ5'), answer: t('profile.faqA5') },
-    ],
-    [t],
-  );
 
   const welcome = useMemo(
     () => ({
@@ -89,17 +78,15 @@ export function FloatingAssistantChat() {
 
   const pushAssistantReply = useCallback(
     (question: string) => {
-      const chipReply = getQuickChipReply(question, quickLabelMap, smartCtx);
       const reply =
-        chipReply ||
-        getInstantAssistantReply(question, faqItems, smartCtx) ||
+        getInstantAssistantReply(question, smartCtx, quickLabelMap) ||
         t('dashboard.chatbotFallback');
       setMsgs((m) => [
         ...m,
         { id: `a_${Date.now()}`, role: 'assistant', text: reply },
       ]);
     },
-    [faqItems, quickLabelMap, smartCtx, t],
+    [quickLabelMap, smartCtx, t],
   );
 
   const sendQuestion = useCallback(

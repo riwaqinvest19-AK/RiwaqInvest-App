@@ -1,3 +1,8 @@
+import {
+  assistantKnowledgeAsFaq,
+  matchAssistantKnowledge,
+} from '@/lib/assistantKnowledge';
+
 export type FaqChatEntry = { question: string; answer: string };
 
 export type SmartReplyContext = {
@@ -34,82 +39,11 @@ function scoreQuestion(userMsg: string, faq: FaqChatEntry): number {
   return score;
 }
 
-type TopicRule = {
-  id: string;
-  patterns: RegExp[];
-  pick: (faqItems: FaqChatEntry[], ctx: SmartReplyContext) => string;
-};
-
-function buildTopicRules(ctx: SmartReplyContext): TopicRule[] {
-  return [
-    {
-      id: 'topup',
-      patterns: [
-        /شحن|محفظ|رصيد|تحويل|ccp|rip|rib|virement|recharge|top.?up|fund|wallet|deposit|alimenter|crediter/u,
-      ],
-      pick: (_faq, c) =>
-        c.topUpReply ??
-        'Use bank transfer or CCP Algeria Post from the payment screen. Account: Riwaq Invest SARL — BNA Agence Alger Centre.',
-    },
-    {
-      id: 'returns',
-      patterns: [
-        /ربح|ارباح|عائد|عوائد|return|profit|rendement|gain|roi|interest|yield|احسب|calculate|calcul/u,
-      ],
-      pick: (_faq, c) =>
-        c.returnsReply ??
-        'Returns depend on the project annual rate and duration. Check the simulator tab for projections and your portfolio for actual performance.',
-    },
-    {
-      id: 'invest',
-      patterns: [
-        /استثمار|استثمر|invest|investir|projet|project|portfolio|محفظ|amount|مبلغ|ابد|commencer|start/u,
-      ],
-      pick: (_faq, c) =>
-        c.investReply ??
-        'Browse published projects, pick an amount that meets the minimum, and confirm from your wallet balance.',
-    },
-    {
-      id: 'verify',
-      patterns: [
-        /وثق|توثيق|verify|verification|kyc|identity|identite|هوية|حساب/u,
-      ],
-      pick: (_faq, c) =>
-        c.verifyReply ??
-        faq.find((x) => /verify|وثق|verification/i.test(x.question))?.answer ??
-        faq[2]?.answer ??
-        '',
-    },
-  ];
-}
-
-function matchTopicReply(
-  userMessage: string,
-  faqItems: FaqChatEntry[],
-  ctx: SmartReplyContext,
-): string | null {
-  const lower = normalize(userMessage);
-  for (const rule of buildTopicRules(ctx)) {
-    if (rule.patterns.some((re) => re.test(lower))) {
-      const reply = rule.pick(faqItems, ctx).trim();
-      if (reply) return reply;
-    }
-  }
-  return null;
-}
-
-function localFaqAnswer(
-  userMessage: string,
-  faqItems: FaqChatEntry[],
-  ctx: SmartReplyContext,
-): string {
+function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string {
   const trimmed = userMessage.trim();
   if (!trimmed) {
     return faqItems[0]?.answer ?? '';
   }
-
-  const topicReply = matchTopicReply(trimmed, faqItems, ctx);
-  if (topicReply) return topicReply;
 
   let best: FaqChatEntry | null = null;
   let bestScore = 0;
@@ -122,21 +56,24 @@ function localFaqAnswer(
   }
 
   if (best && bestScore >= 2) {
-    return bestScore >= 3 ? `${best.answer}\n\n(${best.question})` : best.answer;
+    return best.answer;
   }
 
   const lower = normalize(trimmed);
   if (/(hello|hi|salam|مرحب|bonjour|ahlan|assalam)/u.test(lower)) {
     return faqItems[0]?.answer ?? '';
   }
-  if (/(new|جديد|debut|start|ابد|commencer|debuter)/u.test(lower)) {
-    const intro = faqItems[0];
-    const invest = faqItems.find((x) => /invest|استثمار|investir/i.test(x.question));
-    return [intro?.answer, invest?.answer].filter(Boolean).join('\n\n');
-  }
 
-  return faqItems[0]?.answer ?? faqItems[2]?.answer ?? '';
+  return faqItems[0]?.answer ?? '';
 }
+
+/** Map quick-chip labels to canonical knowledge questions for exact answers. */
+const QUICK_CHIP_CANONICAL: Record<'invest' | 'returns' | 'topUp' | 'verify', string> = {
+  invest: 'كيف أستثمر وبكم؟',
+  returns: 'كيف أحصل على العائد وهل هو مضمون؟',
+  topUp: 'طرق الدفع والسحب؟',
+  verify: 'ما هو KYC ولماذا أحتاجه؟',
+};
 
 /** Map localized quick-chip labels to dedicated smart replies when available. */
 export function getQuickChipReply(
@@ -145,10 +82,16 @@ export function getQuickChipReply(
   ctx: SmartReplyContext,
 ): string | null {
   const trimmed = chipLabel.trim();
-  if (trimmed === quickLabels.invest.trim() && ctx.investReply) return ctx.investReply;
-  if (trimmed === quickLabels.returns.trim() && ctx.returnsReply) return ctx.returnsReply;
-  if (trimmed === quickLabels.topUp.trim() && ctx.topUpReply) return ctx.topUpReply;
-  if (trimmed === quickLabels.verify.trim() && ctx.verifyReply) return ctx.verifyReply;
+  const keys = ['invest', 'returns', 'topUp', 'verify'] as const;
+  for (const key of keys) {
+    if (trimmed === quickLabels[key].trim()) {
+      const canonical = QUICK_CHIP_CANONICAL[key];
+      const knowledge = matchAssistantKnowledge(canonical);
+      if (knowledge) return knowledge;
+      const ctxKey = `${key}Reply` as keyof SmartReplyContext;
+      if (ctx[ctxKey]) return ctx[ctxKey] as string;
+    }
+  }
   return null;
 }
 
@@ -158,22 +101,38 @@ export type ChatbotApiPayload = {
   faq: FaqChatEntry[];
 };
 
-/** Instant smart reply — local FAQ + topic rules (no network wait). */
+/** Instant smart reply — full knowledge base + quick chips (no network). */
 export function getInstantAssistantReply(
   userMessage: string,
-  faqItems: FaqChatEntry[],
   ctx: SmartReplyContext = {},
+  quickLabels?: { invest: string; returns: string; topUp: string; verify: string },
 ): string {
-  return localFaqAnswer(userMessage, faqItems, ctx);
+  const trimmed = userMessage.trim();
+  if (!trimmed) {
+    return ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
+  }
+
+  if (quickLabels) {
+    const chip = getQuickChipReply(trimmed, quickLabels, ctx);
+    if (chip) return chip;
+  }
+
+  const knowledgeHit = matchAssistantKnowledge(trimmed);
+  if (knowledgeHit) return knowledgeHit;
+
+  return localFaqAnswer(trimmed, assistantKnowledgeAsFaq());
 }
+
+const ASSISTANT_KNOWLEDGE_FIRST_ANSWER =
+  'تطبيق رقمي للتمويل الجماعي العقاري يهدف إلى ربط المستثمرين بالمشاريع العقارية، وتمكينهم من المشاركة في تمويل المشاريع بمبالغ مناسبة مع توفير المعلومات اللازمة.';
 
 export async function getAssistantReply(
   userMessage: string,
   locale: string,
-  faqItems: FaqChatEntry[],
   ctx: SmartReplyContext = {},
 ): Promise<string> {
-  const local = getInstantAssistantReply(userMessage, faqItems, ctx);
+  const faq = assistantKnowledgeAsFaq();
+  const local = getInstantAssistantReply(userMessage, ctx);
   const apiUrl = process.env.EXPO_PUBLIC_CHATBOT_API_URL?.trim();
   if (!apiUrl) {
     return local;
@@ -192,7 +151,7 @@ export async function getAssistantReply(
     const res = await fetch(apiUrl, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ message: userMessage, locale, faq: faqItems } satisfies ChatbotApiPayload),
+      body: JSON.stringify({ message: userMessage, locale, faq } satisfies ChatbotApiPayload),
     });
     if (res.ok) {
       const data = (await res.json()) as { reply?: string };
