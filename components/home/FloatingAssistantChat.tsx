@@ -14,6 +14,8 @@ import {
   Text,
   TextInput,
   View,
+  type NativeSyntheticEvent,
+  type TextInputKeyPressEventData,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -159,6 +161,42 @@ export function FloatingAssistantChat() {
     await sendQuestion(input);
   }, [input, sendQuestion]);
 
+  const submitComposer = useCallback(() => {
+    if (busy || !input.trim()) return;
+    void send();
+  }, [busy, input, send]);
+
+  const handleComposerKeyPress = useCallback(
+    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      if (event.nativeEvent.key !== 'Enter') return;
+
+      const shiftKey =
+        Platform.OS === 'web'
+          ? Boolean(
+              (event.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean }).shiftKey,
+            )
+          : false;
+
+      if (shiftKey) return;
+
+      event.preventDefault?.();
+      submitComposer();
+    },
+    [submitComposer],
+  );
+
+  const webEnterToSendProps =
+    Platform.OS === 'web'
+      ? ({
+          onKeyDown: (event: { key: string; shiftKey: boolean; preventDefault: () => void }) => {
+            if (event.key === 'Enter' && !event.shiftKey) {
+              event.preventDefault();
+              submitComposer();
+            }
+          },
+        } as object)
+      : {};
+
   const goFaq = useCallback(() => {
     setOpen(false);
     router.push('/(tabs)/profile/faq' as Href);
@@ -302,13 +340,17 @@ export function FloatingAssistantChat() {
                   editable={!busy}
                   readOnly={false}
                   autoCorrect={false}
+                  returnKeyType="send"
+                  enablesReturnKeyAutomatically
                   {...(Platform.OS === 'web'
                     ? ({ outlineStyle: 'none' } as { outlineStyle: 'none' })
                     : {})}
+                  {...webEnterToSendProps}
                   onFocus={() => {
                     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120);
                   }}
-                  onSubmitEditing={() => void send()}
+                  onSubmitEditing={submitComposer}
+                  onKeyPress={handleComposerKeyPress}
                   blurOnSubmit={false}
                 />
                 <Pressable
