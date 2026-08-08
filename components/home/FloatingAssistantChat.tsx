@@ -62,6 +62,7 @@ export function FloatingAssistantChat() {
       returns: t('dashboard.chatbotQuickReturns'),
       topUp: t('dashboard.chatbotQuickTopUp'),
       verify: t('dashboard.chatbotQuickVerify'),
+      notifications: t('dashboard.chatbotQuickNotifications'),
     }),
     [t],
   );
@@ -72,6 +73,7 @@ export function FloatingAssistantChat() {
       t('dashboard.chatbotQuickReturns'),
       t('dashboard.chatbotQuickTopUp'),
       t('dashboard.chatbotQuickVerify'),
+      t('dashboard.chatbotQuickNotifications'),
     ],
     [t],
   );

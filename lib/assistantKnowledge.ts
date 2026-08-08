@@ -3,6 +3,8 @@ export type AssistantKnowledgeEntry = {
   section: string;
   question: string;
   answer: string;
+  /** Extra phrasings that should resolve to the same canonical answer. */
+  aliases?: string[];
   patterns: RegExp[];
 };
 
@@ -152,6 +154,29 @@ export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
       /change\s+phone/u,
       /supprimer\s+compte/u,
       /changer\s+telephone/u,
+    ],
+  },
+  {
+    id: 'notifications',
+    section: 'account',
+    question: 'هل سأحصل على إشعارات؟',
+    answer:
+      'يمكن للتطبيق إرسال إشعارات حول الاستثمارات والمشاريع والتحديثات المهمة.',
+    aliases: [
+      'هل احصل على اشعارات',
+      'هل أحصل على إشعارات',
+      'إشعارات التطبيق',
+      'التنبيهات',
+      'هل توجد إشعارات',
+    ],
+    patterns: [
+      /إشعار/u,
+      /اشعار/u,
+      /تنبيه/u,
+      /notification/u,
+      /notif/u,
+      /push\s*alert/u,
+      /alertes/u,
     ],
   },
 
@@ -399,6 +424,46 @@ export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
   },
 ];
 
+/** Arabic/English stop-words ignored in fuzzy question matching. */
+const STOP_WORDS = new Set([
+  'هل',
+  'ما',
+  'من',
+  'في',
+  'على',
+  'الى',
+  'إلى',
+  'ان',
+  'أن',
+  'او',
+  'أو',
+  'هو',
+  'هي',
+  'the',
+  'is',
+  'are',
+  'will',
+  'can',
+  'do',
+  'i',
+  'my',
+  'me',
+  'to',
+  'of',
+  'and',
+  'or',
+  'a',
+  'an',
+]);
+
+/** User intent buckets — prevent cross-topic false positives (e.g. invest vs notifications). */
+const TOPIC_HINTS = {
+  notifications: /إشعار|اشعار|تنبيه|notification|notif|alerte|push/u,
+  email: /ايميل|إيميل|email|e\s*mail|بريد\s+الكترون|courriel/u,
+  returns: /ربح|ارباح|عائد|عوائد|profit|return|rendement|gain|roi/u,
+  invest: /استثمر|استثمار|invest|investir|مبلغ\s+استث/u,
+} as const;
+
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -410,33 +475,40 @@ function normalize(s: string): string {
     .trim();
 }
 
-function tokenize(s: string): Set<string> {
+function tokenizeQuestion(s: string): Set<string> {
   const n = normalize(s);
-  const parts = n.split(/\s+/).filter((w) => w.length > 1);
+  const parts = n.split(/\s+/).filter((w) => w.length > 1 && !STOP_WORDS.has(w));
   return new Set(parts);
 }
 
-function tokenOverlapScore(userMsg: string, question: string, answer: string): number {
-  const u = tokenize(userMsg);
-  const q = tokenize(question);
-  const a = tokenize(answer);
+function tokenOverlapScore(userMsg: string, question: string): number {
+  const u = tokenizeQuestion(userMsg);
+  const q = tokenizeQuestion(question);
   let score = 0;
   for (const w of u) {
-    if (q.has(w)) score += 4;
-    if (a.has(w)) score += 1;
+    if (q.has(w)) score += 5;
   }
   return score;
 }
 
-function exactOrNearQuestionMatch(userMsg: string, question: string): boolean {
-  const u = normalize(userMsg);
-  const q = normalize(question);
-  if (!u || !q) return false;
-  if (u === q) return true;
-  if (u.includes(q) || q.includes(u)) {
-    return Math.min(u.length, q.length) >= Math.max(u.length, q.length) * 0.55;
+function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: string): boolean {
+  const hasNotifications = TOPIC_HINTS.notifications.test(normalizedUser);
+  const hasEmail = TOPIC_HINTS.email.test(normalizedUser);
+  const hasReturns = TOPIC_HINTS.returns.test(normalizedUser);
+  const hasInvest = TOPIC_HINTS.invest.test(normalizedUser);
+
+  if (hasNotifications || hasEmail) {
+    if (entry.section === 'invest' && !hasInvest) return false;
+    if (entry.id === 'returns_guarantee' || entry.id === 'returns_timing_loss') {
+      if (!hasReturns) return false;
+    }
   }
-  return false;
+
+  if (hasNotifications && entry.id !== 'notifications' && entry.section === 'invest') {
+    return false;
+  }
+
+  return true;
 }
 
 /** Returns the best-matching canonical answer, or null if no confident match. */
@@ -445,38 +517,50 @@ export function matchAssistantKnowledge(userMessage: string): string | null {
   if (!trimmed) return null;
 
   const normalizedUser = normalize(trimmed);
-  let bestAnswer: string | null = null;
-  let bestScore = 0;
 
+  // 1) Exact normalized match — 100% priority, immediate return.
   for (const entry of ASSISTANT_KNOWLEDGE) {
-    let score = 0;
-
-    if (exactOrNearQuestionMatch(trimmed, entry.question)) {
-      score += 2000;
-    }
-
     if (normalize(entry.question) === normalizedUser) {
-      score += 3000;
+      return entry.answer;
     }
+    for (const alias of entry.aliases ?? []) {
+      if (normalize(alias) === normalizedUser) {
+        return entry.answer;
+      }
+    }
+  }
 
+  // 2) Regex pattern match — topic-aware, highest pattern score wins.
+  let patternAnswer: string | null = null;
+  let patternScore = 0;
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
     for (const re of entry.patterns) {
       if (re.test(trimmed) || re.test(normalizedUser)) {
-        score += 800;
+        const score = entry.id === 'notifications' ? 900 : 800;
+        if (score > patternScore) {
+          patternScore = score;
+          patternAnswer = entry.answer;
+        }
         break;
       }
     }
+  }
+  if (patternAnswer) return patternAnswer;
 
-    score += tokenOverlapScore(trimmed, entry.question, entry.answer);
-
+  // 3) Fuzzy question-token overlap — question text only, stricter threshold.
+  let bestAnswer: string | null = null;
+  let bestScore = 0;
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
+    const score = tokenOverlapScore(trimmed, entry.question);
     if (score > bestScore) {
       bestScore = score;
       bestAnswer = entry.answer;
     }
   }
 
-  // Require a confident match (exact/pattern or strong keyword overlap).
-  if (bestScore >= 800) return bestAnswer;
-  if (bestScore >= 12) return bestAnswer;
+  if (bestScore >= 10) return bestAnswer;
   return null;
 }
 

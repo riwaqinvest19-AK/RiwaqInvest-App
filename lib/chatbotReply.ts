@@ -12,6 +12,14 @@ export type SmartReplyContext = {
   verifyReply?: string;
 };
 
+export type QuickChipLabels = {
+  invest: string;
+  returns: string;
+  topUp: string;
+  verify: string;
+  notifications: string;
+};
+
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -30,20 +38,16 @@ function tokenize(s: string): Set<string> {
 function scoreQuestion(userMsg: string, faq: FaqChatEntry): number {
   const u = tokenize(userMsg);
   const q = tokenize(faq.question);
-  const a = tokenize(faq.answer);
   let score = 0;
   for (const w of u) {
     if (q.has(w)) score += 3;
-    if (a.has(w)) score += 1;
   }
   return score;
 }
 
-function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string {
+function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string | null {
   const trimmed = userMessage.trim();
-  if (!trimmed) {
-    return faqItems[0]?.answer ?? '';
-  }
+  if (!trimmed) return null;
 
   let best: FaqChatEntry | null = null;
   let bestScore = 0;
@@ -55,38 +59,39 @@ function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string {
     }
   }
 
-  if (best && bestScore >= 2) {
+  if (best && bestScore >= 9) {
     return best.answer;
   }
 
-  const lower = normalize(trimmed);
-  if (/(hello|hi|salam|مرحب|bonjour|ahlan|assalam)/u.test(lower)) {
-    return faqItems[0]?.answer ?? '';
-  }
-
-  return faqItems[0]?.answer ?? '';
+  return null;
 }
 
 /** Map quick-chip labels to canonical knowledge questions for exact answers. */
-const QUICK_CHIP_CANONICAL: Record<'invest' | 'returns' | 'topUp' | 'verify', string> = {
+const QUICK_CHIP_CANONICAL: Record<keyof QuickChipLabels, string> = {
   invest: 'كيف أستثمر وبكم؟',
   returns: 'كيف أحصل على العائد وهل هو مضمون؟',
   topUp: 'طرق الدفع والسحب؟',
-  verify: 'ما هو KYC ولماذا أحتاجه؟',
+  verify: 'ما هو KYC ولماذا أحتاجhe؟',
+  notifications: 'هل سأحصل على إشعارات؟',
 };
 
 /** Map localized quick-chip labels to dedicated smart replies when available. */
 export function getQuickChipReply(
   chipLabel: string,
-  quickLabels: { invest: string; returns: string; topUp: string; verify: string },
+  quickLabels: QuickChipLabels,
   ctx: SmartReplyContext,
 ): string | null {
   const trimmed = chipLabel.trim();
-  const keys = ['invest', 'returns', 'topUp', 'verify'] as const;
+  const keys: (keyof QuickChipLabels)[] = [
+    'invest',
+    'returns',
+    'topUp',
+    'verify',
+    'notifications',
+  ];
   for (const key of keys) {
     if (trimmed === quickLabels[key].trim()) {
-      const canonical = QUICK_CHIP_CANONICAL[key];
-      const knowledge = matchAssistantKnowledge(canonical);
+      const knowledge = matchAssistantKnowledge(QUICK_CHIP_CANONICAL[key]);
       if (knowledge) return knowledge;
       const ctxKey = `${key}Reply` as keyof SmartReplyContext;
       if (ctx[ctxKey]) return ctx[ctxKey] as string;
@@ -101,12 +106,15 @@ export type ChatbotApiPayload = {
   faq: FaqChatEntry[];
 };
 
+const ASSISTANT_KNOWLEDGE_FIRST_ANSWER =
+  'تطبيق رقمي للتمويل الجماعي العقاري يهدف إلى ربط المستثمرين بالمشاريع العقارية، وتمكينهم من المشاركة في تمويل المشاريع بمبالغ مناسبة مع توفير المعلومات اللازمة.';
+
 /** Instant smart reply — full knowledge base + quick chips (no network). */
 export function getInstantAssistantReply(
   userMessage: string,
   ctx: SmartReplyContext = {},
-  quickLabels?: { invest: string; returns: string; topUp: string; verify: string },
-): string {
+  quickLabels?: QuickChipLabels,
+): string | null {
   const trimmed = userMessage.trim();
   if (!trimmed) {
     return ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
@@ -123,9 +131,6 @@ export function getInstantAssistantReply(
   return localFaqAnswer(trimmed, assistantKnowledgeAsFaq());
 }
 
-const ASSISTANT_KNOWLEDGE_FIRST_ANSWER =
-  'تطبيق رقمي للتمويل الجماعي العقاري يهدف إلى ربط المستثمرين بالمشاريع العقارية، وتمكينهم من المشاركة في تمويل المشاريع بمبالغ مناسبة مع توفير المعلومات اللازمة.';
-
 export async function getAssistantReply(
   userMessage: string,
   locale: string,
@@ -135,7 +140,7 @@ export async function getAssistantReply(
   const local = getInstantAssistantReply(userMessage, ctx);
   const apiUrl = process.env.EXPO_PUBLIC_CHATBOT_API_URL?.trim();
   if (!apiUrl) {
-    return local;
+    return local ?? ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
   }
 
   try {
@@ -162,5 +167,5 @@ export async function getAssistantReply(
   } catch {
     /* fall back */
   }
-  return local;
+  return local ?? ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
 }
