@@ -71,6 +71,49 @@ export const KNOWLEDGE_BASE: KnowledgeBaseEntry[] = [
   },
 ];
 
+export type FaqDataEntry = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
+const FAQ_DATA_PRIORITY: FaqDataEntry[] = [
+  {
+    id: 'free_use',
+    question: 'هل استخدام Riwaq Invest مجاني؟',
+    answer:
+      'إنشاء الحساب واستعراض المشاريع قد يكون مجانياً، بينما قد تطبق رسوم أو عمولات على بعض العمليات وفق شروط الخدمة.',
+  },
+  {
+    id: 'commission_fee',
+    question: 'كم تبلغ عمولة Riwaq Invest؟',
+    answer: 'تحدد العمولة وفق نموذج الإيرادات وشروط العملية، وقد تختلف حسب المشروع والخدمة.',
+  },
+  {
+    id: 'investment_fees',
+    question: 'هل توجد رسوم على الاستثمار؟',
+    answer: 'إذا كانت هناك رسوم، يتم عرضها بوضوح قبل تأكيد العملية.',
+  },
+  {
+    id: 'hidden_fees',
+    question: 'هل توجد رسوم خفية؟',
+    answer:
+      'لا ينبغي أن تكون هناك رسوم غير معلنة. يجب عرض جميع الرسوم المطبقة للمستخدم قبل إتمام العملية.',
+  },
+  {
+    id: 'data_security',
+    question: 'هل بياناتي آمنة؟',
+    answer:
+      'يعمل التطبيق على حماية بيانات المستخدمين من خلال إجراءات تقنية وتنظيمية مناسبة، مع ضرورة الالتزام بسياسات حماية البيانات المعمول بها.',
+  },
+  {
+    id: 'notifications',
+    question: 'هل سأحصل على إشعارات؟',
+    answer:
+      'يمكن للتطبيق إرسال إشعارات حول الاستثمارات والمشاريع والتحديثات المهمة.',
+  },
+];
+
 /** Full Riwaq Assistant knowledge base — competition Q&A (7 sections, 27 entries). */
 export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
   {
@@ -539,112 +582,54 @@ function tokenOverlapScore(userMsg: string, question: string): number {
   return score;
 }
 
-function matchKnowledgeBase(userMessage: string): string | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
+function buildFaqData(): FaqDataEntry[] {
+  const map = new Map<string, FaqDataEntry>();
+  const add = (entry: FaqDataEntry) => {
+    const key = normalize(entry.question);
+    if (!key || map.has(key)) return;
+    map.set(key, entry);
+  };
 
-  const normalizedUser = normalize(trimmed);
-
-  for (const entry of KNOWLEDGE_BASE) {
-    if (normalize(entry.question) === normalizedUser) {
-      return entry.answer;
-    }
+  for (const entry of FAQ_DATA_PRIORITY) add(entry);
+  KNOWLEDGE_BASE.forEach((entry, index) => {
+    add({ id: `kb_${index + 1}`, question: entry.question, answer: entry.answer });
+  });
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    add({ id: entry.id, question: entry.question, answer: entry.answer });
   }
 
-  let bestAnswer: string | null = null;
-  let bestScore = 0;
-
-  for (const entry of KNOWLEDGE_BASE) {
-    let score = 0;
-    for (const keyword of entry.keywords) {
-      const normalizedKeyword = normalize(keyword);
-      if (!normalizedKeyword) continue;
-      if (normalizedUser.includes(normalizedKeyword)) {
-        score += normalizedKeyword.length;
-      }
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestAnswer = entry.answer;
-    }
-  }
-
-  if (bestScore > 0) return bestAnswer;
-  return null;
+  return Array.from(map.values());
 }
 
-function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: string): boolean {
-  const hasNotifications = TOPIC_HINTS.notifications.test(normalizedUser);
-  const hasEmail = TOPIC_HINTS.email.test(normalizedUser);
-  const hasReturns = TOPIC_HINTS.returns.test(normalizedUser);
-  const hasInvest = TOPIC_HINTS.invest.test(normalizedUser);
+let faqDataCache: FaqDataEntry[] | null = null;
 
-  if (hasNotifications || hasEmail) {
-    if (entry.section === 'invest' && !hasInvest) return false;
-    if (entry.section === 'returns' && !hasReturns) return false;
+function getFaqData(): FaqDataEntry[] {
+  if (!faqDataCache) faqDataCache = buildFaqData();
+  return faqDataCache;
+}
+
+function findFaqEntry(message: string): FaqDataEntry | undefined {
+  const normalized = normalize(message.trim());
+  if (!normalized) return undefined;
+
+  const direct = getFaqData().find((entry) => normalize(entry.question) === normalized);
+  if (direct) return direct;
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    for (const alias of entry.aliases ?? []) {
+      if (normalize(alias) === normalized) {
+        return getFaqData().find((faq) => faq.id === entry.id);
+      }
+    }
   }
 
-  if (hasNotifications && entry.id !== 'notifications') {
-    if (entry.section === 'invest' || entry.section === 'returns') return false;
-  }
-
-  return true;
+  return undefined;
 }
 
 export function matchAssistantKnowledge(userMessage: string): string | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
-
-  const normalizedUser = normalize(trimmed);
-
-  const knowledgeBaseHit = matchKnowledgeBase(trimmed);
-  if (knowledgeBaseHit) return knowledgeBaseHit;
-
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (normalize(entry.question) === normalizedUser) {
-      return entry.answer;
-    }
-    for (const alias of entry.aliases ?? []) {
-      if (normalize(alias) === normalizedUser) {
-        return entry.answer;
-      }
-    }
-  }
-
-  let patternAnswer: string | null = null;
-  let patternScore = 0;
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    for (const re of entry.patterns) {
-      if (re.test(trimmed) || re.test(normalizedUser)) {
-        const score = entry.id === 'notifications' ? 900 : 800;
-        if (score > patternScore) {
-          patternScore = score;
-          patternAnswer = entry.answer;
-        }
-        break;
-      }
-    }
-  }
-  if (patternAnswer) return patternAnswer;
-
-  let bestAnswer: string | null = null;
-  let bestScore = 0;
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    const score = tokenOverlapScore(trimmed, entry.question);
-    if (score > bestScore) {
-      bestScore = score;
-      bestAnswer = entry.answer;
-    }
-  }
-
-  if (bestScore >= 10) return bestAnswer;
-  return null;
+  return findFaqEntry(userMessage)?.answer ?? null;
 }
 
 export function assistantKnowledgeAsFaq(): { question: string; answer: string }[] {
-  const priority = KNOWLEDGE_BASE.map(({ question, answer }) => ({ question, answer }));
-  const extended = ASSISTANT_KNOWLEDGE.map(({ question, answer }) => ({ question, answer }));
-  return [...priority, ...extended];
+  return getFaqData().map(({ question, answer }) => ({ question, answer }));
 }

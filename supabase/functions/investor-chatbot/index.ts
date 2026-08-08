@@ -75,6 +75,8 @@ ${faqText}`;
   return text || null;
 }
 
+const SUGGESTION_PROMPT = "اختر السؤال الأقرب لما تبحث عنه:";
+
 Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: { ...cors } });
@@ -96,7 +98,10 @@ Deno.serve(async (req: Request) => {
   const faq = assistantKnowledgeAsFaq();
 
   if (!message.trim()) {
-    return json({ reply: faq[0]?.answer ?? "" });
+    return json({
+      reply: SUGGESTION_PROMPT,
+      suggestions: faq.slice(0, 8).map((entry) => entry.question),
+    });
   }
 
   const knowledgeHit = matchAssistantKnowledge(message);
@@ -110,5 +115,8 @@ Deno.serve(async (req: Request) => {
     if (ai) return json({ reply: ai });
   }
 
-  return json({ reply: faq[0]?.answer ?? "" });
+  return json({
+    reply: SUGGESTION_PROMPT,
+    suggestions: faq.slice(0, 8).map((entry) => entry.question),
+  });
 });

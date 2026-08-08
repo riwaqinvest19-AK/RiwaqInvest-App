@@ -66,19 +66,14 @@ export type ChatbotApiPayload = {
   faq: FaqChatEntry[];
 };
 
-const ASSISTANT_KNOWLEDGE_FIRST_ANSWER =
-  'تطبيق رقمي للتمويل الجماعي العقاري يهدف إلى ربط المستثمرين بالمشاريع العقارية، وتمكينهم من المشاركة في تمويل المشاريع بمبالغ مناسبة مع توفير المعلومات اللازمة.';
-
-/** Instant smart reply — full knowledge base + quick chips (no network). */
+/** Instant smart reply — exact static dictionary match only (no fallback guessing). */
 export function getInstantAssistantReply(
   userMessage: string,
   ctx: SmartReplyContext = {},
   quickLabels?: QuickChipLabels,
 ): string | null {
   const trimmed = userMessage.trim();
-  if (!trimmed) {
-    return ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
-  }
+  if (!trimmed) return null;
 
   if (quickLabels) {
     const chip = getQuickChipReply(trimmed, quickLabels, ctx);
@@ -118,10 +113,11 @@ export async function getAssistantReply(
   ctx: SmartReplyContext = {},
 ): Promise<string> {
   const faq = assistantKnowledgeAsFaq();
-  const local = getInstantAssistantReply(userMessage, ctx);
+  const interaction = resolveInstantAssistantInteraction(userMessage, ctx);
   const apiUrl = process.env.EXPO_PUBLIC_CHATBOT_API_URL?.trim();
   if (!apiUrl) {
-    return local ?? ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
+    if (interaction.kind === 'answer') return interaction.answer;
+    return interaction.prompt;
   }
 
   try {
@@ -148,5 +144,7 @@ export async function getAssistantReply(
   } catch {
     /* fall back */
   }
-  return local ?? ASSISTANT_KNOWLEDGE_FIRST_ANSWER;
+
+  if (interaction.kind === 'answer') return interaction.answer;
+  return interaction.prompt;
 }

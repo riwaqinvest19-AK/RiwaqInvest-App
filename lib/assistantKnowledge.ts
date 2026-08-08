@@ -71,6 +71,50 @@ export const KNOWLEDGE_BASE: KnowledgeBaseEntry[] = [
   },
 ];
 
+export type FaqDataEntry = {
+  id: string;
+  question: string;
+  answer: string;
+};
+
+/** Guaranteed static Q&A — highest priority in dictionary lookup. */
+const FAQ_DATA_PRIORITY: FaqDataEntry[] = [
+  {
+    id: 'free_use',
+    question: 'هل استخدام Riwaq Invest مجاني؟',
+    answer:
+      'إنشاء الحساب واستعراض المشاريع قد يكون مجانياً، بينما قد تطبق رسوم أو عمولات على بعض العمليات وفق شروط الخدمة.',
+  },
+  {
+    id: 'commission_fee',
+    question: 'كم تبلغ عمولة Riwaq Invest؟',
+    answer: 'تحدد العمولة وفق نموذج الإيرادات وشروط العملية، وقد تختلف حسب المشروع والخدمة.',
+  },
+  {
+    id: 'investment_fees',
+    question: 'هل توجد رسوم على الاستثمار؟',
+    answer: 'إذا كانت هناك رسوم، يتم عرضها بوضوح قبل تأكيد العملية.',
+  },
+  {
+    id: 'hidden_fees',
+    question: 'هل توجد رسوم خفية؟',
+    answer:
+      'لا ينبغي أن تكون هناك رسوم غير معلنة. يجب عرض جميع الرسوم المطبقة للمستخدم قبل إتمام العملية.',
+  },
+  {
+    id: 'data_security',
+    question: 'هل بياناتي آمنة؟',
+    answer:
+      'يعمل التطبيق على حماية بيانات المستخدمين من خلال إجراءات تقنية وتنظيمية مناسبة، مع ضرورة الالتزام بسياسات حماية البيانات المعمول بها.',
+  },
+  {
+    id: 'notifications',
+    question: 'هل سأحصل على إشعارات؟',
+    answer:
+      'يمكن للتطبيق إرسال إشعارات حول الاستثمارات والمشاريع والتحديثات المهمة.',
+  },
+];
+
 /** Full Riwaq Assistant knowledge base — competition Q&A (7 sections, 26 entries). */
 export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
   // ── 1. أسئلة عامة ──
@@ -519,14 +563,6 @@ const STOP_WORDS = new Set([
   'an',
 ]);
 
-/** User intent buckets — prevent cross-topic false positives (e.g. invest vs notifications). */
-const TOPIC_HINTS = {
-  notifications: /إشعار|اشعار|تنبيه|notification|notif|alerte|push/u,
-  email: /ايميل|إيميل|email|e\s*mail|بريد\s+الكترون|courriel/u,
-  returns: /ربح|ارباح|عائد|عوائد|profit|return|rendement|gain|roi/u,
-  invest: /استثمر|استثمار|invest|investir|مبلغ\s+استث/u,
-} as const;
-
 function normalize(s: string): string {
   return s
     .toLowerCase()
@@ -554,117 +590,13 @@ function tokenOverlapScore(userMsg: string, question: string): number {
   return score;
 }
 
-/** Priority layer — exact question or keyword overlap in KNOWLEDGE_BASE. */
-function matchKnowledgeBase(userMessage: string): string | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
-
-  const normalizedUser = normalize(trimmed);
-
-  for (const entry of KNOWLEDGE_BASE) {
-    if (normalize(entry.question) === normalizedUser) {
-      return entry.answer;
-    }
-  }
-
-  let bestAnswer: string | null = null;
-  let bestScore = 0;
-
-  for (const entry of KNOWLEDGE_BASE) {
-    let score = 0;
-    for (const keyword of entry.keywords) {
-      const normalizedKeyword = normalize(keyword);
-      if (!normalizedKeyword) continue;
-      if (normalizedUser.includes(normalizedKeyword)) {
-        score += normalizedKeyword.length;
-      }
-    }
-    if (score > bestScore) {
-      bestScore = score;
-      bestAnswer = entry.answer;
-    }
-  }
-
-  if (bestScore > 0) return bestAnswer;
-  return null;
-}
-
-function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: string): boolean {
-  const hasNotifications = TOPIC_HINTS.notifications.test(normalizedUser);
-  const hasEmail = TOPIC_HINTS.email.test(normalizedUser);
-  const hasReturns = TOPIC_HINTS.returns.test(normalizedUser);
-  const hasInvest = TOPIC_HINTS.invest.test(normalizedUser);
-
-  if (hasNotifications || hasEmail) {
-    if (entry.section === 'invest' && !hasInvest) return false;
-    if (entry.section === 'returns' && !hasReturns) return false;
-  }
-
-  if (hasNotifications && entry.id !== 'notifications') {
-    if (entry.section === 'invest' || entry.section === 'returns') return false;
-  }
-
-  return true;
-}
-
-/** Returns the best-matching canonical answer, or null if no confident match. */
+/** Static dictionary lookup — exact question match only (no fuzzy/pattern guessing). */
 export function matchAssistantKnowledge(userMessage: string): string | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
-
-  const normalizedUser = normalize(trimmed);
-
-  const knowledgeBaseHit = matchKnowledgeBase(trimmed);
-  if (knowledgeBaseHit) return knowledgeBaseHit;
-
-  // 1) Exact normalized match — 100% priority, immediate return.
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (normalize(entry.question) === normalizedUser) {
-      return entry.answer;
-    }
-    for (const alias of entry.aliases ?? []) {
-      if (normalize(alias) === normalizedUser) {
-        return entry.answer;
-      }
-    }
-  }
-
-  // 2) Regex pattern match — topic-aware, highest pattern score wins.
-  let patternAnswer: string | null = null;
-  let patternScore = 0;
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    for (const re of entry.patterns) {
-      if (re.test(trimmed) || re.test(normalizedUser)) {
-        const score = entry.id === 'notifications' ? 900 : 800;
-        if (score > patternScore) {
-          patternScore = score;
-          patternAnswer = entry.answer;
-        }
-        break;
-      }
-    }
-  }
-  if (patternAnswer) return patternAnswer;
-
-  // 3) Fuzzy question-token overlap — question text only, stricter threshold.
-  let bestAnswer: string | null = null;
-  let bestScore = 0;
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    const score = tokenOverlapScore(trimmed, entry.question);
-    if (score > bestScore) {
-      bestScore = score;
-      bestAnswer = entry.answer;
-    }
-  }
-
-  if (bestScore >= 10) return bestAnswer;
-  return null;
+  return findFaqEntry(userMessage)?.answer ?? null;
 }
 
 export function assistantKnowledgeAsFaq(): { question: string; answer: string }[] {
-  return getAssistantQuestionCatalog().map(({ question, answer }) => ({ question, answer }));
+  return getFaqData().map(({ question, answer }) => ({ question, answer }));
 }
 
 export type AssistantCatalogEntry = {
@@ -760,51 +692,89 @@ const TOPIC_KEYWORD_MAP: Array<{ keywords: string[]; topics: string[] }> = [
   { keywords: ['riwaq', 'رواق'], topics: ['general'] },
 ];
 
+let faqDataCache: FaqDataEntry[] | null = null;
+
+function buildFaqData(): FaqDataEntry[] {
+  const map = new Map<string, FaqDataEntry>();
+  const add = (entry: FaqDataEntry) => {
+    const key = normalize(entry.question);
+    if (!key || map.has(key)) return;
+    map.set(key, entry);
+  };
+
+  for (const entry of FAQ_DATA_PRIORITY) add(entry);
+  KNOWLEDGE_BASE.forEach((entry, index) => {
+    add({ id: `kb_${index + 1}`, question: entry.question, answer: entry.answer });
+  });
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    add({ id: entry.id, question: entry.question, answer: entry.answer });
+  }
+  SUPPLEMENTARY_FAQ.forEach((entry, index) => {
+    add({ id: `profile_${index + 1}`, question: entry.question, answer: entry.answer });
+  });
+
+  return Array.from(map.values());
+}
+
+export function getFaqData(): FaqDataEntry[] {
+  if (!faqDataCache) faqDataCache = buildFaqData();
+  return faqDataCache;
+}
+
+/** Full static FAQ dictionary used for direct question → answer mapping. */
+export const FAQ_DATA: FaqDataEntry[] = getFaqData();
+
+export function findFaqEntry(message: string): FaqDataEntry | undefined {
+  const normalized = normalize(message.trim());
+  if (!normalized) return undefined;
+
+  const direct = getFaqData().find((entry) => normalize(entry.question) === normalized);
+  if (direct) return direct;
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    for (const alias of entry.aliases ?? []) {
+      if (normalize(alias) === normalized) {
+        return getFaqData().find((faq) => faq.id === entry.id);
+      }
+    }
+  }
+
+  return undefined;
+}
+
+export function findFaqEntryById(id: string): FaqDataEntry | undefined {
+  return getFaqData().find((entry) => entry.id === id);
+}
+
 let catalogCache: AssistantCatalogEntry[] | null = null;
 
 export function getAssistantQuestionCatalog(): AssistantCatalogEntry[] {
   if (catalogCache) return catalogCache;
 
-  const map = new Map<string, AssistantCatalogEntry>();
-  const add = (question: string, answer: string, topics: string[]) => {
-    const key = normalize(question);
-    if (!key) return;
-    map.set(key, { question, answer, topics });
-  };
+  catalogCache = getFaqData().map((entry) => ({
+    question: entry.question,
+    answer: entry.answer,
+    topics:
+      KNOWLEDGE_BASE_TOPICS[entry.question] ??
+      SECTION_TO_TOPICS[
+        ASSISTANT_KNOWLEDGE.find((item) => item.id === entry.id)?.section ?? ''
+      ] ??
+      SUPPLEMENTARY_FAQ.find((item) => normalize(item.question) === normalize(entry.question))
+        ?.topics ??
+      ['general'],
+  }));
 
-  for (const entry of KNOWLEDGE_BASE) {
-    add(entry.question, entry.answer, KNOWLEDGE_BASE_TOPICS[entry.question] ?? ['general']);
-  }
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    add(entry.question, entry.answer, SECTION_TO_TOPICS[entry.section] ?? ['general']);
-  }
-  for (const entry of SUPPLEMENTARY_FAQ) {
-    add(entry.question, entry.answer, entry.topics);
-  }
-
-  catalogCache = Array.from(map.values());
   return catalogCache;
 }
 
-export function getAnswerForQuestion(question: string): string | null {
-  const normalized = normalize(question.trim());
-  if (!normalized) return null;
+export function getAnswerForQuestion(questionOrId: string): string | null {
+  const trimmed = questionOrId.trim();
+  if (!trimmed) return null;
+  return findFaqEntryById(trimmed)?.answer ?? findFaqEntry(trimmed)?.answer ?? null;
+}
 
-  for (const entry of getAssistantQuestionCatalog()) {
-    if (normalize(entry.question) === normalized) {
-      return entry.answer;
-    }
-  }
-
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    for (const alias of entry.aliases ?? []) {
-      if (normalize(alias) === normalized) {
-        return entry.answer;
-      }
-    }
-  }
-
-  return matchAssistantKnowledge(question);
+export function getAnswerById(id: string): string | null {
+  return findFaqEntryById(id)?.answer ?? null;
 }
 
 function isGeneralKeywordMessage(message: string): boolean {
@@ -882,82 +852,7 @@ function rankSuggestedQuestions(message: string, limit = 8): string[] {
   return ranked.slice(0, limit).map((item) => item.question);
 }
 
-type EvaluatedMatch = {
-  answer: string;
-  confidence: number;
-  matchedQuestion: string;
-};
-
-function evaluateAssistantMatch(userMessage: string): EvaluatedMatch | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
-
-  const normalizedUser = normalize(trimmed);
-
-  for (const entry of getAssistantQuestionCatalog()) {
-    if (normalize(entry.question) === normalizedUser) {
-      return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
-    }
-  }
-
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    for (const alias of entry.aliases ?? []) {
-      if (normalize(alias) === normalizedUser) {
-        return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
-      }
-    }
-  }
-
-  for (const entry of KNOWLEDGE_BASE) {
-    if (normalize(entry.question) === normalizedUser) {
-      return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
-    }
-
-    let keywordScore = 0;
-    let longestKeyword = 0;
-    for (const keyword of entry.keywords) {
-      const normalizedKeyword = normalize(keyword);
-      if (normalizedKeyword && normalizedUser.includes(normalizedKeyword)) {
-        keywordScore += normalizedKeyword.length;
-        longestKeyword = Math.max(longestKeyword, normalizedKeyword.length);
-      }
-    }
-
-    if (keywordScore > 0) {
-      const overlap = tokenOverlapScore(trimmed, entry.question);
-      const coverage = longestKeyword / Math.max(normalizedUser.length, 1);
-      const confidence = Math.min(
-        100,
-        Math.round(coverage * 100 + overlap * 2 + (coverage >= 0.75 ? 10 : 0)),
-      );
-      return { answer: entry.answer, confidence, matchedQuestion: entry.question };
-    }
-  }
-
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    for (const re of entry.patterns) {
-      if (re.test(trimmed) || re.test(normalizedUser)) {
-        return { answer: entry.answer, confidence: 88, matchedQuestion: entry.question };
-      }
-    }
-  }
-
-  let best: EvaluatedMatch | null = null;
-  for (const entry of ASSISTANT_KNOWLEDGE) {
-    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
-    const overlap = tokenOverlapScore(trimmed, entry.question);
-    if (overlap < 10) continue;
-    const confidence = Math.min(89, overlap * 4);
-    if (!best || confidence > best.confidence) {
-      best = { answer: entry.answer, confidence, matchedQuestion: entry.question };
-    }
-  }
-
-  return best;
-}
-
-/** Smart interaction — direct answer when confidence ≥ 90%, otherwise related question chips. */
+/** Smart interaction — exact static match only, otherwise suggestion chips. */
 export function resolveAssistantInteraction(
   userMessage: string,
   prompt = ASSISTANT_SUGGESTION_PROMPT,
@@ -967,26 +862,18 @@ export function resolveAssistantInteraction(
     return {
       kind: 'suggestions',
       prompt,
-      questions: getAssistantQuestionCatalog()
+      questions: getFaqData()
         .slice(0, 8)
         .map((entry) => entry.question),
     };
   }
 
-  if (isGeneralKeywordMessage(trimmed)) {
-    return {
-      kind: 'suggestions',
-      prompt,
-      questions: rankSuggestedQuestions(trimmed),
-    };
-  }
-
-  const evaluated = evaluateAssistantMatch(trimmed);
-  if (evaluated && evaluated.confidence >= 90) {
+  const entry = findFaqEntry(trimmed);
+  if (entry) {
     return {
       kind: 'answer',
-      answer: evaluated.answer,
-      confidence: evaluated.confidence,
+      answer: entry.answer,
+      confidence: 100,
     };
   }
 

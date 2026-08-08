@@ -125,17 +125,12 @@ export function FloatingAssistantChat() {
       setBusy(true);
       try {
         await new Promise((resolve) => setTimeout(resolve, SUGGESTED_ANSWER_DELAY_MS));
-        const interaction = resolveInstantAssistantInteraction(
-          q,
-          smartCtx,
-          quickLabelMap,
-          suggestionPrompt,
-        );
-        const answer =
-          getDirectAnswerForQuestion(q) ||
-          (interaction.kind === 'answer' ? interaction.answer : null) ||
-          t('dashboard.chatbotFallback');
-        appendAssistantMessage({ role: 'assistant', text: answer });
+        const answer = getDirectAnswerForQuestion(q);
+        if (answer) {
+          appendAssistantMessage({ role: 'assistant', text: answer });
+        } else {
+          pushAssistantInteraction(q);
+        }
       } finally {
         setBusy(false);
       }
