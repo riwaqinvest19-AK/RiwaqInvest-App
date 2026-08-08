@@ -13,7 +13,6 @@ import {
   Pressable,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -148,14 +147,22 @@ export function FloatingAssistantChat() {
       <Modal visible={open} animationType="slide" transparent onRequestClose={() => setOpen(false)}>
         <KeyboardAvoidingView
           className="flex-1"
-          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 24}>
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
-            <View className="flex-1 justify-end bg-black/45">
-              <Pressable className="flex-1" onPress={() => setOpen(false)} />
-              <View
-                className="max-h-[82%] rounded-t-3xl bg-white"
-                style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}>
+          <View className="flex-1 justify-end bg-black/45" pointerEvents="box-none">
+            <Pressable
+              className="absolute inset-0"
+              accessibilityRole="button"
+              accessibilityLabel={t('dashboard.chatbotFabA11y')}
+              onPress={() => {
+                Keyboard.dismiss();
+                setOpen(false);
+              }}
+            />
+            <View
+              className="max-h-[82%] rounded-t-3xl bg-white"
+              pointerEvents="auto"
+              style={{ paddingBottom: Math.max(insets.bottom, 12) }}>
                 <View className="flex-row items-center justify-between border-b border-slate-200 px-4 py-3">
                   <Pressable
                     accessibilityRole="button"
@@ -215,7 +222,9 @@ export function FloatingAssistantChat() {
                   </View>
                 ) : null}
 
-                <View className="flex-row items-end gap-2 border-t border-slate-100 px-3 pb-2 pt-2">
+                <View
+                  className="flex-row items-end gap-2 border-t border-slate-100 px-3 pb-2 pt-2"
+                  pointerEvents="auto">
                   <TextInput
                     value={input}
                     onChangeText={setInput}
@@ -225,9 +234,16 @@ export function FloatingAssistantChat() {
                     style={{ textAlign: alignEnd as 'left' | 'right' }}
                     multiline
                     editable={!busy}
+                    readOnly={false}
+                    autoCorrect={false}
+                    {...(Platform.OS === 'web'
+                      ? ({ outlineStyle: 'none' } as { outlineStyle: 'none' })
+                      : {})}
                     onFocus={() => {
                       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120);
                     }}
+                    onSubmitEditing={() => void send()}
+                    blurOnSubmit={false}
                   />
                   <Pressable
                     accessibilityRole="button"
@@ -243,8 +259,7 @@ export function FloatingAssistantChat() {
                   </Pressable>
                 </View>
               </View>
-            </View>
-          </TouchableWithoutFeedback>
+          </View>
         </KeyboardAvoidingView>
       </Modal>
     </>

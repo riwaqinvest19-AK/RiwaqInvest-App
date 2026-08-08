@@ -20,58 +20,12 @@ export type QuickChipLabels = {
   notifications: string;
 };
 
-function normalize(s: string): string {
-  return s
-    .toLowerCase()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-z0-9\u0600-\u06FF\s]/gi, ' ')
-    .trim();
-}
-
-function tokenize(s: string): Set<string> {
-  const n = normalize(s);
-  const parts = n.split(/\s+/).filter((w) => w.length > 2);
-  return new Set(parts);
-}
-
-function scoreQuestion(userMsg: string, faq: FaqChatEntry): number {
-  const u = tokenize(userMsg);
-  const q = tokenize(faq.question);
-  let score = 0;
-  for (const w of u) {
-    if (q.has(w)) score += 3;
-  }
-  return score;
-}
-
-function localFaqAnswer(userMessage: string, faqItems: FaqChatEntry[]): string | null {
-  const trimmed = userMessage.trim();
-  if (!trimmed) return null;
-
-  let best: FaqChatEntry | null = null;
-  let bestScore = 0;
-  for (const item of faqItems) {
-    const s = scoreQuestion(trimmed, item);
-    if (s > bestScore) {
-      bestScore = s;
-      best = item;
-    }
-  }
-
-  if (best && bestScore >= 9) {
-    return best.answer;
-  }
-
-  return null;
-}
-
 /** Map quick-chip labels to canonical knowledge questions for exact answers. */
 const QUICK_CHIP_CANONICAL: Record<keyof QuickChipLabels, string> = {
   invest: 'كيف أستثمر وبكم؟',
   returns: 'كيف أحصل على العائد وهل هو مضمون؟',
   topUp: 'طرق الدفع والسحب؟',
-  verify: 'ما هو KYC ولماذا أحتاجhe؟',
+  verify: 'ما هو KYC ولماذا أحتاج\u0647؟',
   notifications: 'هل سأحصل على إشعارات؟',
 };
 
@@ -128,7 +82,7 @@ export function getInstantAssistantReply(
   const knowledgeHit = matchAssistantKnowledge(trimmed);
   if (knowledgeHit) return knowledgeHit;
 
-  return localFaqAnswer(trimmed, assistantKnowledgeAsFaq());
+  return null;
 }
 
 export async function getAssistantReply(

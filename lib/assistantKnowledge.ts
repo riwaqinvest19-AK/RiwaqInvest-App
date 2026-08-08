@@ -499,13 +499,11 @@ function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: 
 
   if (hasNotifications || hasEmail) {
     if (entry.section === 'invest' && !hasInvest) return false;
-    if (entry.id === 'returns_guarantee' || entry.id === 'returns_timing_loss') {
-      if (!hasReturns) return false;
-    }
+    if (entry.section === 'returns' && !hasReturns) return false;
   }
 
-  if (hasNotifications && entry.id !== 'notifications' && entry.section === 'invest') {
-    return false;
+  if (hasNotifications && entry.id !== 'notifications') {
+    if (entry.section === 'invest' || entry.section === 'returns') return false;
   }
 
   return true;
