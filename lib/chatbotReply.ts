@@ -1,7 +1,13 @@
 import {
+  ASSISTANT_SUGGESTION_PROMPT,
   assistantKnowledgeAsFaq,
+  getAnswerForQuestion,
   matchAssistantKnowledge,
+  resolveAssistantInteraction,
+  type AssistantInteractionResult,
 } from '@/lib/assistantKnowledge';
+
+export type { AssistantInteractionResult };
 
 export type FaqChatEntry = { question: string; answer: string };
 
@@ -79,10 +85,31 @@ export function getInstantAssistantReply(
     if (chip) return chip;
   }
 
-  const knowledgeHit = matchAssistantKnowledge(trimmed);
-  if (knowledgeHit) return knowledgeHit;
-
+  const interaction = resolveInstantAssistantInteraction(userMessage, ctx, quickLabels);
+  if (interaction.kind === 'answer') return interaction.answer;
   return null;
+}
+
+export function resolveInstantAssistantInteraction(
+  userMessage: string,
+  ctx: SmartReplyContext = {},
+  quickLabels?: QuickChipLabels,
+  prompt = ASSISTANT_SUGGESTION_PROMPT,
+): AssistantInteractionResult {
+  const trimmed = userMessage.trim();
+
+  if (quickLabels) {
+    const chip = getQuickChipReply(trimmed, quickLabels, ctx);
+    if (chip) {
+      return { kind: 'answer', answer: chip, confidence: 100 };
+    }
+  }
+
+  return resolveAssistantInteraction(trimmed, prompt);
+}
+
+export function getDirectAnswerForQuestion(question: string): string | null {
+  return getAnswerForQuestion(question);
 }
 
 export async function getAssistantReply(

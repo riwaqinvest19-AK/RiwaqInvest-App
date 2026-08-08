@@ -8,6 +8,69 @@ export type AssistantKnowledgeEntry = {
   patterns: RegExp[];
 };
 
+export type KnowledgeBaseEntry = {
+  keywords: string[];
+  question: string;
+  answer: string;
+};
+
+/** Priority Q&A — matched first via keywords before the broader knowledge base. */
+export const KNOWLEDGE_BASE: KnowledgeBaseEntry[] = [
+  {
+    keywords: ['إشعارات', 'اشعارات', 'إشعار', 'اشعار', 'تنبيهات'],
+    question: 'هل سأحصل على إشعارات؟',
+    answer:
+      'يمكن للتطبيق إرسال إشعارات حول الاستثمارات والمشاريع والتحديثات المهمة.',
+  },
+  {
+    keywords: ['تمويل استثماري', 'تمويل استثماراتي', 'كيف أثول استثماري', 'طريقة التمويل'],
+    question: 'كيف يمكنني تمويل استثماري؟',
+    answer:
+      'تتم عمليات التمويل من خلال وسائل الدفع الإلكتروني التي سيتم اعتمادها وربطها بالتطبيق وفق الإطار القانوني والتنظيمي.',
+  },
+  {
+    keywords: ['الفرق بين رصيد المحفظة', 'رصيد المحفظة والاستثمار', 'فرق المحفظة'],
+    question: 'ما الفرق بين رصيد المحفظة والاستثمار؟',
+    answer:
+      'رصيد المحفظة يمثل الأموال المتاحة للاستخدام وفق النظام، بينما الاستثمار يمثل المبلغ المخصص لمشروع معين.',
+  },
+  {
+    keywords: ['سحب أموالي', 'سحب الأموال', 'كيف أسحب'],
+    question: 'هل يمكنني سحب أموالي؟',
+    answer:
+      'تعتمد إمكانية السحب على طبيعة الرصيد، ومرحلة الاستثمار، وشروط المشروع والأنظمة المعتمدة.',
+  },
+  {
+    keywords: ['سجل معاملاتي', 'سجل المعاملات', 'معاملاتي', 'History'],
+    question: 'أين أجد سجل معاملاتي؟',
+    answer: 'من قسم المعاملات / Transaction History داخل حسابك.',
+  },
+  {
+    keywords: ['CIB', 'الذهبية', 'EDAHABIA', 'بطاقة نقدية'],
+    question: 'هل يدعم التطبيق CIB أو EDAHABIA؟',
+    answer:
+      'يمكن دعم وسائل الدفع المحلية المعتمدة (CIB و EDAHABIA) بعد استكمال إجراءات الربط والتراخيص اللازمة.',
+  },
+  {
+    keywords: ['المطور تحديد مبلغ', 'تحديد التمويل للمطور'],
+    question: 'هل يمكن للمطور تحديد مبلغ التمويل؟',
+    answer:
+      'يتم تحديد قيمة التمويل المستهدف وفق دراسة المشروع وشروط الإدراج والتقييم المعتمد.',
+  },
+  {
+    keywords: ['أتابع استثماري', 'متابعة استثماري', 'كيف أتابع'],
+    question: 'كيف أتابع استثماري؟',
+    answer:
+      'من قسم استثماراتي يمكنك الاطلاع على المشاريع التي شاركت فيها وحالة كل استثمار.',
+  },
+  {
+    keywords: ['تقدم المشروع', 'متابعة المشروع العقاري', 'نسبة الإنجاز'],
+    question: 'هل يمكنني متابعة تقدم المشروع العقاري؟',
+    answer:
+      'نعم، يمكن توفير تحديثات حول مراحل تنفيذ المشروع ونسبة الإنجاز وفق المعلومات التي يقدمها المطور وآلية المتابعة المعتمدة.',
+  },
+];
+
 /** Full Riwaq Assistant knowledge base — competition Q&A (7 sections, 26 entries). */
 export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
   // ── 1. أسئلة عامة ──
@@ -491,6 +554,41 @@ function tokenOverlapScore(userMsg: string, question: string): number {
   return score;
 }
 
+/** Priority layer — exact question or keyword overlap in KNOWLEDGE_BASE. */
+function matchKnowledgeBase(userMessage: string): string | null {
+  const trimmed = userMessage.trim();
+  if (!trimmed) return null;
+
+  const normalizedUser = normalize(trimmed);
+
+  for (const entry of KNOWLEDGE_BASE) {
+    if (normalize(entry.question) === normalizedUser) {
+      return entry.answer;
+    }
+  }
+
+  let bestAnswer: string | null = null;
+  let bestScore = 0;
+
+  for (const entry of KNOWLEDGE_BASE) {
+    let score = 0;
+    for (const keyword of entry.keywords) {
+      const normalizedKeyword = normalize(keyword);
+      if (!normalizedKeyword) continue;
+      if (normalizedUser.includes(normalizedKeyword)) {
+        score += normalizedKeyword.length;
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestAnswer = entry.answer;
+    }
+  }
+
+  if (bestScore > 0) return bestAnswer;
+  return null;
+}
+
 function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: string): boolean {
   const hasNotifications = TOPIC_HINTS.notifications.test(normalizedUser);
   const hasEmail = TOPIC_HINTS.email.test(normalizedUser);
@@ -515,6 +613,9 @@ export function matchAssistantKnowledge(userMessage: string): string | null {
   if (!trimmed) return null;
 
   const normalizedUser = normalize(trimmed);
+
+  const knowledgeBaseHit = matchKnowledgeBase(trimmed);
+  if (knowledgeBaseHit) return knowledgeBaseHit;
 
   // 1) Exact normalized match — 100% priority, immediate return.
   for (const entry of ASSISTANT_KNOWLEDGE) {
@@ -563,5 +664,335 @@ export function matchAssistantKnowledge(userMessage: string): string | null {
 }
 
 export function assistantKnowledgeAsFaq(): { question: string; answer: string }[] {
-  return ASSISTANT_KNOWLEDGE.map(({ question, answer }) => ({ question, answer }));
+  return getAssistantQuestionCatalog().map(({ question, answer }) => ({ question, answer }));
+}
+
+export type AssistantCatalogEntry = {
+  question: string;
+  answer: string;
+  topics: string[];
+};
+
+export type AssistantInteractionResult =
+  | { kind: 'answer'; answer: string; confidence: number }
+  | { kind: 'suggestions'; prompt: string; questions: string[] };
+
+export const ASSISTANT_SUGGESTION_PROMPT = 'اختر السؤال الأقرب لما تبحث عنه:';
+
+const SECTION_TO_TOPICS: Record<string, string[]> = {
+  general: ['general'],
+  account: ['account', 'wallet', 'notifications'],
+  kyc: ['verify', 'kyc'],
+  projects: ['projects', 'invest'],
+  invest: ['invest'],
+  returns: ['returns'],
+  developers: ['developer'],
+  payments: ['payment', 'wallet'],
+  security: ['security'],
+};
+
+const KNOWLEDGE_BASE_TOPICS: Record<string, string[]> = {
+  'هل سأحصل على إشعارات؟': ['notifications', 'account'],
+  'كيف يمكنني تمويل استثماري؟': ['invest', 'payment'],
+  'ما الفرق بين رصيد المحفظة والاستثمار؟': ['wallet', 'invest', 'payment'],
+  'هل يمكنني سحب أموالي؟': ['wallet', 'payment'],
+  'أين أجد سجل معاملاتي؟': ['wallet', 'payment', 'account'],
+  'هل يدعم التطبيق CIB أو EDAHABIA؟': ['payment'],
+  'هل يمكن للمطور تحديد مبلغ التمويل؟': ['developer', 'projects'],
+  'كيف أتابع استثماري؟': ['invest', 'projects'],
+  'هل يمكنني متابعة تقدم المشروع العقاري؟': ['projects', 'developer'],
+};
+
+/** Profile FAQ entries merged into the assistant catalog. */
+const SUPPLEMENTARY_FAQ: AssistantCatalogEntry[] = [
+  {
+    question: 'كيف أبدأ الاستثمار؟',
+    answer:
+      'تصفح المشاريع المنشورة، افتح مشروعاً، اختر مبلغاً يحقق الحد الأدنى، وأكد استثمارك من رصيد محفظتك.',
+    topics: ['invest', 'projects'],
+  },
+  {
+    question: 'ما الحد الأدنى للاستثمار؟',
+    answer:
+      'الحد الأدنى للاستثمار هو 10,000 دج كما يختلف من مشروع إلى آخر ويعرض في صفحة الاستثمار قبل التأكيد.',
+    topics: ['invest'],
+  },
+  {
+    question: 'كيف أوثق حسابي؟',
+    answer: 'استخدم «بدء التوثيق» في ملفك الشخصي واتبع خطوات الهوية عند توفرها.',
+    topics: ['verify', 'kyc'],
+  },
+  {
+    question: 'كيف أتواصل مع الدعم؟',
+    answer: 'من الملف الشخصي اختر «التواصل مع الدعم» ثم البريد أو واتساب.',
+    topics: ['account'],
+  },
+  {
+    question: 'هل بياناتي آمنة؟',
+    answer: 'نطبّق ممارسات أمان معيارية لحماية حسابك. لا تشارك كلمة المرور مع أي شخص.',
+    topics: ['security'],
+  },
+];
+
+const GENERAL_TOPIC_KEYWORDS = [
+  'استثمار',
+  'استثمر',
+  'محفظة',
+  'المحفظة',
+  'سحب',
+  'دفع',
+  'توثيق',
+  'مطور',
+  'kyc',
+] as const;
+
+const TOPIC_KEYWORD_MAP: Array<{ keywords: string[]; topics: string[] }> = [
+  { keywords: ['استثمار', 'استثمر', 'استثمارات'], topics: ['invest', 'returns', 'projects'] },
+  { keywords: ['محفظة', 'المحفظة', 'رصيد'], topics: ['wallet', 'payment', 'invest'] },
+  { keywords: ['سحب'], topics: ['wallet', 'payment'] },
+  { keywords: ['دفع', 'cib', 'edahabia', 'تحويل', 'شحن'], topics: ['payment', 'wallet'] },
+  { keywords: ['توثيق', 'kyc', 'هوية', 'تحقق'], topics: ['verify', 'kyc'] },
+  { keywords: ['مطور', 'مطورين'], topics: ['developer', 'projects'] },
+  { keywords: ['إشعار', 'اشعار', 'تنبيه'], topics: ['notifications', 'account'] },
+  { keywords: ['ارباح', 'عائد', 'ربح', 'عوائد'], topics: ['returns', 'invest'] },
+  { keywords: ['مشروع', 'مشاريع'], topics: ['projects', 'invest', 'developer'] },
+  { keywords: ['حساب', 'تسجيل', 'بريد'], topics: ['account'] },
+  { keywords: ['riwaq', 'رواق'], topics: ['general'] },
+];
+
+let catalogCache: AssistantCatalogEntry[] | null = null;
+
+export function getAssistantQuestionCatalog(): AssistantCatalogEntry[] {
+  if (catalogCache) return catalogCache;
+
+  const map = new Map<string, AssistantCatalogEntry>();
+  const add = (question: string, answer: string, topics: string[]) => {
+    const key = normalize(question);
+    if (!key) return;
+    map.set(key, { question, answer, topics });
+  };
+
+  for (const entry of KNOWLEDGE_BASE) {
+    add(entry.question, entry.answer, KNOWLEDGE_BASE_TOPICS[entry.question] ?? ['general']);
+  }
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    add(entry.question, entry.answer, SECTION_TO_TOPICS[entry.section] ?? ['general']);
+  }
+  for (const entry of SUPPLEMENTARY_FAQ) {
+    add(entry.question, entry.answer, entry.topics);
+  }
+
+  catalogCache = Array.from(map.values());
+  return catalogCache;
+}
+
+export function getAnswerForQuestion(question: string): string | null {
+  const normalized = normalize(question.trim());
+  if (!normalized) return null;
+
+  for (const entry of getAssistantQuestionCatalog()) {
+    if (normalize(entry.question) === normalized) {
+      return entry.answer;
+    }
+  }
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    for (const alias of entry.aliases ?? []) {
+      if (normalize(alias) === normalized) {
+        return entry.answer;
+      }
+    }
+  }
+
+  return matchAssistantKnowledge(question);
+}
+
+function isGeneralKeywordMessage(message: string): boolean {
+  const normalizedUser = normalize(message);
+  if (!normalizedUser) return false;
+
+  return GENERAL_TOPIC_KEYWORDS.some((keyword) => {
+    const normalizedKeyword = normalize(keyword);
+    return normalizedUser === normalizedKeyword;
+  });
+}
+
+function detectTopicsFromMessage(message: string): Set<string> {
+  const normalizedUser = normalize(message);
+  const topics = new Set<string>();
+
+  for (const group of TOPIC_KEYWORD_MAP) {
+    for (const keyword of group.keywords) {
+      const normalizedKeyword = normalize(keyword);
+      if (normalizedKeyword && normalizedUser.includes(normalizedKeyword)) {
+        for (const topic of group.topics) topics.add(topic);
+      }
+    }
+  }
+
+  return topics;
+}
+
+function scoreCatalogQuestion(message: string, entry: AssistantCatalogEntry): number {
+  const normalizedUser = normalize(message);
+  let score = tokenOverlapScore(message, entry.question);
+
+  for (const keyword of TOPIC_KEYWORD_MAP.flatMap((group) => group.keywords)) {
+    const normalizedKeyword = normalize(keyword);
+    if (
+      normalizedKeyword &&
+      normalizedUser.includes(normalizedKeyword) &&
+      normalize(entry.question).includes(normalizedKeyword)
+    ) {
+      score += normalizedKeyword.length;
+    }
+  }
+
+  const messageTopics = detectTopicsFromMessage(message);
+  for (const topic of entry.topics) {
+    if (messageTopics.has(topic)) score += 12;
+  }
+
+  return score;
+}
+
+function rankSuggestedQuestions(message: string, limit = 8): string[] {
+  const catalog = getAssistantQuestionCatalog();
+  const messageTopics = detectTopicsFromMessage(message);
+  const normalizedUser = normalize(message);
+
+  const ranked = catalog
+    .map((entry) => {
+      let score = scoreCatalogQuestion(message, entry);
+      if (messageTopics.size === 0 && isGeneralKeywordMessage(message)) {
+        score = 0;
+      }
+      if (normalize(entry.question) === normalizedUser) {
+        score += 1000;
+      }
+      return { question: entry.question, score };
+    })
+    .filter((item) => item.score > 0)
+    .sort((a, b) => b.score - a.score);
+
+  if (ranked.length === 0) {
+    return catalog.slice(0, limit).map((entry) => entry.question);
+  }
+
+  return ranked.slice(0, limit).map((item) => item.question);
+}
+
+type EvaluatedMatch = {
+  answer: string;
+  confidence: number;
+  matchedQuestion: string;
+};
+
+function evaluateAssistantMatch(userMessage: string): EvaluatedMatch | null {
+  const trimmed = userMessage.trim();
+  if (!trimmed) return null;
+
+  const normalizedUser = normalize(trimmed);
+
+  for (const entry of getAssistantQuestionCatalog()) {
+    if (normalize(entry.question) === normalizedUser) {
+      return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
+    }
+  }
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    for (const alias of entry.aliases ?? []) {
+      if (normalize(alias) === normalizedUser) {
+        return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
+      }
+    }
+  }
+
+  for (const entry of KNOWLEDGE_BASE) {
+    if (normalize(entry.question) === normalizedUser) {
+      return { answer: entry.answer, confidence: 100, matchedQuestion: entry.question };
+    }
+
+    let keywordScore = 0;
+    let longestKeyword = 0;
+    for (const keyword of entry.keywords) {
+      const normalizedKeyword = normalize(keyword);
+      if (normalizedKeyword && normalizedUser.includes(normalizedKeyword)) {
+        keywordScore += normalizedKeyword.length;
+        longestKeyword = Math.max(longestKeyword, normalizedKeyword.length);
+      }
+    }
+
+    if (keywordScore > 0) {
+      const overlap = tokenOverlapScore(trimmed, entry.question);
+      const coverage = longestKeyword / Math.max(normalizedUser.length, 1);
+      const confidence = Math.min(
+        100,
+        Math.round(coverage * 100 + overlap * 2 + (coverage >= 0.75 ? 10 : 0)),
+      );
+      return { answer: entry.answer, confidence, matchedQuestion: entry.question };
+    }
+  }
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
+    for (const re of entry.patterns) {
+      if (re.test(trimmed) || re.test(normalizedUser)) {
+        return { answer: entry.answer, confidence: 88, matchedQuestion: entry.question };
+      }
+    }
+  }
+
+  let best: EvaluatedMatch | null = null;
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    if (!entryAllowedForMessage(entry, normalizedUser)) continue;
+    const overlap = tokenOverlapScore(trimmed, entry.question);
+    if (overlap < 10) continue;
+    const confidence = Math.min(89, overlap * 4);
+    if (!best || confidence > best.confidence) {
+      best = { answer: entry.answer, confidence, matchedQuestion: entry.question };
+    }
+  }
+
+  return best;
+}
+
+/** Smart interaction — direct answer when confidence ≥ 90%, otherwise related question chips. */
+export function resolveAssistantInteraction(
+  userMessage: string,
+  prompt = ASSISTANT_SUGGESTION_PROMPT,
+): AssistantInteractionResult {
+  const trimmed = userMessage.trim();
+  if (!trimmed) {
+    return {
+      kind: 'suggestions',
+      prompt,
+      questions: getAssistantQuestionCatalog()
+        .slice(0, 8)
+        .map((entry) => entry.question),
+    };
+  }
+
+  if (isGeneralKeywordMessage(trimmed)) {
+    return {
+      kind: 'suggestions',
+      prompt,
+      questions: rankSuggestedQuestions(trimmed),
+    };
+  }
+
+  const evaluated = evaluateAssistantMatch(trimmed);
+  if (evaluated && evaluated.confidence >= 90) {
+    return {
+      kind: 'answer',
+      answer: evaluated.answer,
+      confidence: evaluated.confidence,
+    };
+  }
+
+  return {
+    kind: 'suggestions',
+    prompt,
+    questions: rankSuggestedQuestions(trimmed),
+  };
 }

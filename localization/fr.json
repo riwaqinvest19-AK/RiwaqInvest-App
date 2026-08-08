@@ -128,6 +128,7 @@
     "chatbotWelcome": "Bonjour ! Posez vos questions sur l’investissement, les rendements ou la vérification — je m’appuie sur la FAQ.",
     "chatbotPlaceholder": "Votre question…",
     "chatbotFallback": "Je n’ai pas trouvé de réponse dans la FAQ. Ouvrez la page d’aide ou reformulez votre question.",
+    "chatbotSuggestionPrompt": "Choisissez la question la plus proche de votre recherche :",
     "chatbotQuickInvest": "Comment investir ?",
     "chatbotQuickReturns": "Comment sont calculés les rendements ?",
     "chatbotQuickTopUp": "Comment recharger mon portefeuille ?",

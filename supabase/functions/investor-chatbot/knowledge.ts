@@ -8,6 +8,69 @@ export type AssistantKnowledgeEntry = {
   patterns: RegExp[];
 };
 
+export type KnowledgeBaseEntry = {
+  keywords: string[];
+  question: string;
+  answer: string;
+};
+
+/** Priority Q&A — matched first via keywords before the broader knowledge base. */
+export const KNOWLEDGE_BASE: KnowledgeBaseEntry[] = [
+  {
+    keywords: ['إشعارات', 'اشعارات', 'إشعار', 'اشعار', 'تنبيهات'],
+    question: 'هل سأحصل على إشعارات؟',
+    answer:
+      'يمكن للتطبيق إرسال إشعارات حول الاستثمارات والمشاريع والتحديثات المهمة.',
+  },
+  {
+    keywords: ['تمويل استثماري', 'تمويل استثماراتي', 'كيف أثول استثماري', 'طريقة التمويل'],
+    question: 'كيف يمكنني تمويل استثماري؟',
+    answer:
+      'تتم عمليات التمويل من خلال وسائل الدفع الإلكتروني التي سيتم اعتمادها وربطها بالتطبيق وفق الإطار القانوني والتنظيمي.',
+  },
+  {
+    keywords: ['الفرق بين رصيد المحفظة', 'رصيد المحفظة والاستثمار', 'فرق المحفظة'],
+    question: 'ما الفرق بين رصيد المحفظة والاستثمار؟',
+    answer:
+      'رصيد المحفظة يمثل الأموال المتاحة للاستخدام وفق النظام، بينما الاستثمار يمثل المبلغ المخصص لمشروع معين.',
+  },
+  {
+    keywords: ['سحب أموالي', 'سحب الأموال', 'كيف أسحب'],
+    question: 'هل يمكنني سحب أموالي؟',
+    answer:
+      'تعتمد إمكانية السحب على طبيعة الرصيد، ومرحلة الاستثمار، وشروط المشروع والأنظمة المعتمدة.',
+  },
+  {
+    keywords: ['سجل معاملاتي', 'سجل المعاملات', 'معاملاتي', 'History'],
+    question: 'أين أجد سجل معاملاتي؟',
+    answer: 'من قسم المعاملات / Transaction History داخل حسابك.',
+  },
+  {
+    keywords: ['CIB', 'الذهبية', 'EDAHABIA', 'بطاقة نقدية'],
+    question: 'هل يدعم التطبيق CIB أو EDAHABIA؟',
+    answer:
+      'يمكن دعم وسائل الدفع المحلية المعتمدة (CIB و EDAHABIA) بعد استكمال إجراءات الربط والتراخيص اللازمة.',
+  },
+  {
+    keywords: ['المطور تحديد مبلغ', 'تحديد التمويل للمطور'],
+    question: 'هل يمكن للمطور تحديد مبلغ التمويل؟',
+    answer:
+      'يتم تحديد قيمة التمويل المستهدف وفق دراسة المشروع وشروط الإدراج والتقييم المعتمد.',
+  },
+  {
+    keywords: ['أتابع استثماري', 'متابعة استثماري', 'كيف أتابع'],
+    question: 'كيف أتابع استثماري؟',
+    answer:
+      'من قسم استثماراتي يمكنك الاطلاع على المشاريع التي شاركت فيها وحالة كل استثمار.',
+  },
+  {
+    keywords: ['تقدم المشروع', 'متابعة المشروع العقاري', 'نسبة الإنجاز'],
+    question: 'هل يمكنني متابعة تقدم المشروع العقاري؟',
+    answer:
+      'نعم، يمكن توفير تحديثات حول مراحل تنفيذ المشروع ونسبة الإنجاز وفق المعلومات التي يقدمها المطور وآلية المتابعة المعتمدة.',
+  },
+];
+
 /** Full Riwaq Assistant knowledge base — competition Q&A (7 sections, 27 entries). */
 export const ASSISTANT_KNOWLEDGE: AssistantKnowledgeEntry[] = [
   {
@@ -476,6 +539,40 @@ function tokenOverlapScore(userMsg: string, question: string): number {
   return score;
 }
 
+function matchKnowledgeBase(userMessage: string): string | null {
+  const trimmed = userMessage.trim();
+  if (!trimmed) return null;
+
+  const normalizedUser = normalize(trimmed);
+
+  for (const entry of KNOWLEDGE_BASE) {
+    if (normalize(entry.question) === normalizedUser) {
+      return entry.answer;
+    }
+  }
+
+  let bestAnswer: string | null = null;
+  let bestScore = 0;
+
+  for (const entry of KNOWLEDGE_BASE) {
+    let score = 0;
+    for (const keyword of entry.keywords) {
+      const normalizedKeyword = normalize(keyword);
+      if (!normalizedKeyword) continue;
+      if (normalizedUser.includes(normalizedKeyword)) {
+        score += normalizedKeyword.length;
+      }
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      bestAnswer = entry.answer;
+    }
+  }
+
+  if (bestScore > 0) return bestAnswer;
+  return null;
+}
+
 function entryAllowedForMessage(entry: AssistantKnowledgeEntry, normalizedUser: string): boolean {
   const hasNotifications = TOPIC_HINTS.notifications.test(normalizedUser);
   const hasEmail = TOPIC_HINTS.email.test(normalizedUser);
@@ -499,6 +596,9 @@ export function matchAssistantKnowledge(userMessage: string): string | null {
   if (!trimmed) return null;
 
   const normalizedUser = normalize(trimmed);
+
+  const knowledgeBaseHit = matchKnowledgeBase(trimmed);
+  if (knowledgeBaseHit) return knowledgeBaseHit;
 
   for (const entry of ASSISTANT_KNOWLEDGE) {
     if (normalize(entry.question) === normalizedUser) {
@@ -544,5 +644,7 @@ export function matchAssistantKnowledge(userMessage: string): string | null {
 }
 
 export function assistantKnowledgeAsFaq(): { question: string; answer: string }[] {
-  return ASSISTANT_KNOWLEDGE.map(({ question, answer }) => ({ question, answer }));
+  const priority = KNOWLEDGE_BASE.map(({ question, answer }) => ({ question, answer }));
+  const extended = ASSISTANT_KNOWLEDGE.map(({ question, answer }) => ({ question, answer }));
+  return [...priority, ...extended];
 }
