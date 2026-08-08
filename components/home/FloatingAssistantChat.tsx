@@ -157,45 +157,44 @@ export function FloatingAssistantChat() {
     [busy, pushAssistantInteraction],
   );
 
-  const send = useCallback(async () => {
-    await sendQuestion(input);
-  }, [input, sendQuestion]);
+  const enterSubmitLockRef = useRef(false);
 
-  const submitComposer = useCallback(() => {
+  const handleSend = useCallback(() => {
     if (busy || !input.trim()) return;
-    void send();
-  }, [busy, input, send]);
+    void sendQuestion(input);
+  }, [busy, input, sendQuestion]);
 
-  const handleComposerKeyPress = useCallback(
-    (event: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
-      if (event.nativeEvent.key !== 'Enter') return;
+  const handleSendOnEnter = useCallback(() => {
+    if (enterSubmitLockRef.current) return;
+    enterSubmitLockRef.current = true;
+    handleSend();
+    setTimeout(() => {
+      enterSubmitLockRef.current = false;
+    }, 0);
+  }, [handleSend]);
 
-      const shiftKey =
-        Platform.OS === 'web'
-          ? Boolean(
-              (event.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean }).shiftKey,
-            )
-          : false;
+  const handleInputKeyPress = useCallback(
+    (e: NativeSyntheticEvent<TextInputKeyPressEventData>) => {
+      if (Platform.OS !== 'web') return;
 
-      if (shiftKey) return;
-
-      event.preventDefault?.();
-      submitComposer();
+      const nativeEvent = e.nativeEvent as TextInputKeyPressEventData & { shiftKey?: boolean };
+      if (nativeEvent.key === 'Enter' && !nativeEvent.shiftKey) {
+        e.preventDefault?.();
+        handleSendOnEnter();
+      }
     },
-    [submitComposer],
+    [handleSendOnEnter],
   );
 
-  const webEnterToSendProps =
-    Platform.OS === 'web'
-      ? ({
-          onKeyDown: (event: { key: string; shiftKey: boolean; preventDefault: () => void }) => {
-            if (event.key === 'Enter' && !event.shiftKey) {
-              event.preventDefault();
-              submitComposer();
-            }
-          },
-        } as object)
-      : {};
+  const handleInputKeyDown = useCallback(
+    (event: { key: string; shiftKey: boolean; preventDefault: () => void }) => {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        handleSendOnEnter();
+      }
+    },
+    [handleSendOnEnter],
+  );
 
   const goFaq = useCallback(() => {
     setOpen(false);
@@ -343,20 +342,22 @@ export function FloatingAssistantChat() {
                   returnKeyType="send"
                   enablesReturnKeyAutomatically
                   {...(Platform.OS === 'web'
-                    ? ({ outlineStyle: 'none' } as { outlineStyle: 'none' })
+                    ? ({
+                        outlineStyle: 'none',
+                        onKeyDown: handleInputKeyDown,
+                      } as { outlineStyle: 'none'; onKeyDown: typeof handleInputKeyDown })
                     : {})}
-                  {...webEnterToSendProps}
                   onFocus={() => {
                     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 120);
                   }}
-                  onSubmitEditing={submitComposer}
-                  onKeyPress={handleComposerKeyPress}
+                  onSubmitEditing={handleSend}
+                  onKeyPress={handleInputKeyPress}
                   blurOnSubmit={false}
                 />
                 <Pressable
                   accessibilityRole="button"
                   disabled={busy || !input.trim()}
-                  onPress={() => void send()}
+                  onPress={handleSend}
                   className="mb-0.5 h-11 w-11 items-center justify-center rounded-full bg-brand-navy disabled:opacity-40">
                   <Ionicons
                     name="send"
