@@ -852,6 +852,127 @@ function rankSuggestedQuestions(message: string, limit = 8): string[] {
   return ranked.slice(0, limit).map((item) => item.question);
 }
 
+const DEFAULT_SMART_SUGGESTIONS = [
+  'كيف أبدأ الاستثمار؟',
+  'كيف أوثق حسابي؟',
+  'كيف أشحن المحفظة؟',
+  'هل سأحصل على إشعارات؟',
+] as const;
+
+const EXTRA_FAQ_KEYWORDS: Record<string, string[]> = {
+  'هل استخدام Riwaq Invest مجاني؟': ['مجاني', 'مجانا', 'استثمار مجاني', 'هل الاستثمار مجاني'],
+  'كم تبلغ عمولة Riwaq Invest؟': ['عمولة', 'عمولات', 'commission'],
+  'هل توجد رسوم على الاستثمار؟': ['رسوم', 'رسوم الاستثمار', 'رسوم على الاستثمار'],
+  'هل توجد رسوم خفية؟': ['رسوم خفية', 'رسوم مخفية', 'رسوم غير معلنة'],
+  'هل بياناتي آمنة؟': ['بيانات', 'امان', 'آمنة', 'أمان', 'بياناتي'],
+  'كيف يقلل التطبيق المخاطر؟': ['مخاطر', 'مخاطر الاستثمار', 'ما هي مخاطر'],
+  'متى أحصل على أرباحي وهل يمكن الخسارة؟': ['مخاطر', 'خسارة', 'مخاطر الاستثمار'],
+};
+
+function deriveSearchKeywords(entry: AssistantKnowledgeEntry): string[] {
+  const sectionHints: Record<string, string[]> = {
+    general: ['riwaq', 'رواق', 'تطبيق'],
+    account: ['حساب', 'تسجيل', 'بريد', 'هاتف'],
+    kyc: ['kyc', 'توثيق', 'تحقق', 'هوية'],
+    projects: ['مشروع', 'مشاريع', 'عقاري'],
+    invest: ['استثمار', 'استثمر', 'مبلغ'],
+    returns: ['مخاطر', 'مخاطر الاستثمار', 'عائد', 'ارباح', 'ربح', 'خسارة'],
+    developers: ['مطور', 'مطورين'],
+    payments: ['دفع', 'محفظة', 'سحب', 'شحن', 'cib', 'edahabia'],
+    security: ['امان', 'آمن', 'تشفير', 'بيانات'],
+  };
+
+  const words = entry.question
+    .replace(/[؟?!.,؛:]/g, ' ')
+    .split(/\s+/)
+    .filter((word) => word.length > 2);
+
+  return [...new Set([...words, ...(entry.aliases ?? []), ...(sectionHints[entry.section] ?? [])])];
+}
+
+let smartSearchCache: KnowledgeBaseEntry[] | null = null;
+
+export function getSmartSearchCatalog(): KnowledgeBaseEntry[] {
+  if (smartSearchCache) return smartSearchCache;
+
+  const map = new Map<string, KnowledgeBaseEntry>();
+  const add = (entry: KnowledgeBaseEntry) => {
+    const key = normalize(entry.question);
+    if (!key || map.has(key)) return;
+    map.set(key, entry);
+  };
+
+  for (const entry of KNOWLEDGE_BASE) add(entry);
+
+  for (const faq of FAQ_DATA_PRIORITY) {
+    add({
+      question: faq.question,
+      answer: faq.answer,
+      keywords: [
+        ...(EXTRA_FAQ_KEYWORDS[faq.question] ?? []),
+        ...faq.question.replace(/[؟?!.,؛:]/g, ' ').split(/\s+/).filter((word) => word.length > 2),
+      ],
+    });
+  }
+
+  for (const entry of ASSISTANT_KNOWLEDGE) {
+    add({
+      question: entry.question,
+      answer: entry.answer,
+      keywords: deriveSearchKeywords(entry),
+    });
+  }
+
+  for (const entry of SUPPLEMENTARY_FAQ) {
+    add({
+      question: entry.question,
+      answer: entry.answer,
+      keywords: entry.question.replace(/[؟?!.,؛:]/g, ' ').split(/\s+/).filter((word) => word.length > 2),
+    });
+  }
+
+  smartSearchCache = Array.from(map.values());
+  return smartSearchCache;
+}
+
+export type SmartSuggestionResult = {
+  exactAnswer: string | null;
+  suggestedQuestions: string[];
+};
+
+/** Dynamic keyword search over the full knowledge catalog. */
+export function getSmartSuggestions(inputText: string): SmartSuggestionResult {
+  const KNOWLEDGE_BASE = getSmartSearchCatalog();
+  const cleanInput = inputText.trim().toLowerCase();
+
+  const exactMatch = KNOWLEDGE_BASE.find(
+    (item) =>
+      item.question.toLowerCase() === cleanInput ||
+      item.keywords.some((k) => cleanInput.includes(k.toLowerCase())),
+  );
+
+  const words = cleanInput.split(' ').filter((w) => w.length > 2);
+  const matched = KNOWLEDGE_BASE.filter((item) =>
+    words.some(
+      (w) =>
+        item.question.toLowerCase().includes(w) ||
+        item.keywords.some((k) => k.toLowerCase().includes(w)),
+    ),
+  );
+
+  if (matched.length > 0) {
+    return {
+      exactAnswer: matched.length === 1 && exactMatch ? exactMatch.answer : null,
+      suggestedQuestions: matched.map((m) => m.question),
+    };
+  }
+
+  return {
+    exactAnswer: null,
+    suggestedQuestions: [...DEFAULT_SMART_SUGGESTIONS],
+  };
+}
+
 /** Smart interaction — exact static match only, otherwise suggestion chips. */
 export function resolveAssistantInteraction(
   userMessage: string,
@@ -862,17 +983,15 @@ export function resolveAssistantInteraction(
     return {
       kind: 'suggestions',
       prompt,
-      questions: getFaqData()
-        .slice(0, 8)
-        .map((entry) => entry.question),
+      questions: [...DEFAULT_SMART_SUGGESTIONS],
     };
   }
 
-  const entry = findFaqEntry(trimmed);
-  if (entry) {
+  const smart = getSmartSuggestions(trimmed);
+  if (smart.exactAnswer) {
     return {
       kind: 'answer',
-      answer: entry.answer,
+      answer: smart.exactAnswer,
       confidence: 100,
     };
   }
@@ -880,6 +999,6 @@ export function resolveAssistantInteraction(
   return {
     kind: 'suggestions',
     prompt,
-    questions: rankSuggestedQuestions(trimmed),
+    questions: smart.suggestedQuestions,
   };
 }

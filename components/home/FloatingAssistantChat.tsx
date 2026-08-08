@@ -19,10 +19,8 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import {
-  getDirectAnswerForQuestion,
-  resolveInstantAssistantInteraction,
-} from '@/lib/chatbotReply';
+import { getSmartSearchCatalog } from '@/lib/assistantKnowledge';
+import { getDirectAnswerForQuestion, getQuickChipReply } from '@/lib/chatbotReply';
 
 type Msg = {
   id: string;
@@ -35,6 +33,38 @@ const BRAND = '#154375';
 const TAB_BAR_CLEARANCE = 64;
 const SUGGESTED_ANSWER_DELAY_MS = 200;
 const TYPED_REPLY_DELAY_MS = 480;
+
+const getSmartSuggestions = (inputText: string) => {
+  const KNOWLEDGE_BASE = getSmartSearchCatalog();
+  const cleanInput = inputText.trim().toLowerCase();
+
+  const exactMatch = KNOWLEDGE_BASE.find(
+    (item) =>
+      item.question.toLowerCase() === cleanInput ||
+      item.keywords.some((k) => cleanInput.includes(k.toLowerCase())),
+  );
+
+  const words = cleanInput.split(' ').filter((w) => w.length > 2);
+  const matched = KNOWLEDGE_BASE.filter((item) =>
+    words.some(
+      (w) =>
+        item.question.toLowerCase().includes(w) ||
+        item.keywords.some((k) => k.toLowerCase().includes(w)),
+    ),
+  );
+
+  if (matched.length > 0) {
+    return {
+      exactAnswer: matched.length === 1 && exactMatch ? exactMatch.answer : null,
+      suggestedQuestions: matched.map((m) => m.question),
+    };
+  }
+
+  return {
+    exactAnswer: null,
+    suggestedQuestions: ['كيف أبدأ الاستثمار؟', 'كيف أوثق حسابي؟', 'كيف أشحن المحفظة؟', 'هل سأحصل على إشعارات؟'],
+  };
+};
 
 export function FloatingAssistantChat() {
   const { t } = useTranslation();
@@ -95,24 +125,24 @@ export function FloatingAssistantChat() {
     setMsgs((m) => [...m, { ...message, id: `a_${Date.now()}` }]);
   }, []);
 
-  const pushAssistantInteraction = useCallback(
-    (question: string) => {
-      const interaction = resolveInstantAssistantInteraction(
-        question,
-        smartCtx,
-        quickLabelMap,
-        suggestionPrompt,
-      );
+  const deliverSmartResponse = useCallback(
+    (userText: string) => {
+      const chipReply = getQuickChipReply(userText, quickLabelMap, smartCtx);
+      if (chipReply) {
+        appendAssistantMessage({ role: 'assistant', text: chipReply });
+        return;
+      }
 
-      if (interaction.kind === 'answer') {
-        appendAssistantMessage({ role: 'assistant', text: interaction.answer });
+      const { exactAnswer, suggestedQuestions } = getSmartSuggestions(userText);
+      if (exactAnswer) {
+        appendAssistantMessage({ role: 'assistant', text: exactAnswer });
         return;
       }
 
       appendAssistantMessage({
         role: 'assistant',
-        text: interaction.prompt,
-        suggestions: interaction.questions,
+        text: suggestionPrompt,
+        suggestions: suggestedQuestions,
       });
     },
     [appendAssistantMessage, quickLabelMap, smartCtx, suggestionPrompt],
@@ -131,13 +161,13 @@ export function FloatingAssistantChat() {
         if (answer) {
           appendAssistantMessage({ role: 'assistant', text: answer });
         } else {
-          pushAssistantInteraction(q);
+          deliverSmartResponse(q);
         }
       } finally {
         setBusy(false);
       }
     },
-    [appendAssistantMessage, busy, quickLabelMap, smartCtx, suggestionPrompt, t],
+    [appendAssistantMessage, busy, deliverSmartResponse],
   );
 
   const sendQuestion = useCallback(
@@ -149,12 +179,12 @@ export function FloatingAssistantChat() {
       setBusy(true);
       try {
         await new Promise((resolve) => setTimeout(resolve, delayMs));
-        pushAssistantInteraction(q);
+        deliverSmartResponse(q);
       } finally {
         setBusy(false);
       }
     },
-    [busy, pushAssistantInteraction],
+    [busy, deliverSmartResponse],
   );
 
   const enterSubmitLockRef = useRef(false);

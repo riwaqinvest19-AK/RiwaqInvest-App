@@ -2,12 +2,15 @@ import {
   ASSISTANT_SUGGESTION_PROMPT,
   assistantKnowledgeAsFaq,
   getAnswerForQuestion,
+  getSmartSuggestions,
   matchAssistantKnowledge,
   resolveAssistantInteraction,
   type AssistantInteractionResult,
+  type SmartSuggestionResult,
 } from '@/lib/assistantKnowledge';
 
-export type { AssistantInteractionResult };
+export type { AssistantInteractionResult, SmartSuggestionResult };
+export { getSmartSuggestions };
 
 export type FaqChatEntry = { question: string; answer: string };
 
