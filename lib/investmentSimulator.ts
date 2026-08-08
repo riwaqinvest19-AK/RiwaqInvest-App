@@ -50,16 +50,14 @@ export function buildGrowthSeries(
   const p = Math.max(0, principal);
   const m = Math.max(0, months);
   const r = Math.max(0, annualRatePct) / 100;
-  if (p <= 0 || m <= 0) return [{ month: 0, value: 0 }];
+  if (p <= 0 || m <= 0) return [{ month: 0, value: p }];
+
   const monthlyFactor = 1 + r / 12;
   const step = Math.max(1, Math.ceil(m / maxSteps));
-  const points: { month: number; value: number }[] = [];
-  for (let mo = 0; mo < m; mo += step) {
+  const points: { month: number; value: number }[] = [{ month: 0, value: p }];
+  for (let mo = step; mo < m; mo += step) {
     points.push({ month: mo, value: p * Math.pow(monthlyFactor, mo) });
   }
-  const last = points[points.length - 1];
-  if (!last || last.month !== m) {
-    points.push({ month: m, value: p * Math.pow(monthlyFactor, m) });
-  }
+  points.push({ month: m, value: p * Math.pow(monthlyFactor, m) });
   return points;
 }

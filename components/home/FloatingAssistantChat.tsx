@@ -18,7 +18,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { type FaqChatEntry, getInstantAssistantReply } from '@/lib/chatbotReply';
+import { type FaqChatEntry, getInstantAssistantReply, getQuickChipReply } from '@/lib/chatbotReply';
 
 type Msg = { id: string; role: 'user' | 'assistant'; text: string };
 
@@ -58,7 +58,22 @@ export function FloatingAssistantChat() {
   const displayMsgs = msgs.length === 0 ? [welcome] : msgs;
 
   const smartCtx = useMemo(
-    () => ({ topUpReply: t('dashboard.chatbotReplyTopUp') }),
+    () => ({
+      topUpReply: t('dashboard.chatbotReplyTopUp'),
+      investReply: t('dashboard.chatbotReplyInvest'),
+      returnsReply: t('dashboard.chatbotReplyReturns'),
+      verifyReply: t('dashboard.chatbotReplyVerify'),
+    }),
+    [t],
+  );
+
+  const quickLabelMap = useMemo(
+    () => ({
+      invest: t('dashboard.chatbotQuickInvest'),
+      returns: t('dashboard.chatbotQuickReturns'),
+      topUp: t('dashboard.chatbotQuickTopUp'),
+      verify: t('dashboard.chatbotQuickVerify'),
+    }),
     [t],
   );
 
@@ -74,14 +89,17 @@ export function FloatingAssistantChat() {
 
   const pushAssistantReply = useCallback(
     (question: string) => {
+      const chipReply = getQuickChipReply(question, quickLabelMap, smartCtx);
       const reply =
-        getInstantAssistantReply(question, faqItems, smartCtx) || t('dashboard.chatbotFallback');
+        chipReply ||
+        getInstantAssistantReply(question, faqItems, smartCtx) ||
+        t('dashboard.chatbotFallback');
       setMsgs((m) => [
         ...m,
         { id: `a_${Date.now()}`, role: 'assistant', text: reply },
       ]);
     },
-    [faqItems, smartCtx, t],
+    [faqItems, quickLabelMap, smartCtx, t],
   );
 
   const sendQuestion = useCallback(
@@ -93,6 +111,7 @@ export function FloatingAssistantChat() {
       setMsgs((m) => [...m, userMsg]);
       setBusy(true);
       try {
+        await new Promise((resolve) => setTimeout(resolve, 480));
         pushAssistantReply(q);
       } finally {
         setBusy(false);

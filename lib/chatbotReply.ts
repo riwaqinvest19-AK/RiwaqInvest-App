@@ -2,6 +2,9 @@ export type FaqChatEntry = { question: string; answer: string };
 
 export type SmartReplyContext = {
   topUpReply?: string;
+  investReply?: string;
+  returnsReply?: string;
+  verifyReply?: string;
 };
 
 function normalize(s: string): string {
@@ -51,31 +54,31 @@ function buildTopicRules(ctx: SmartReplyContext): TopicRule[] {
     {
       id: 'returns',
       patterns: [
-        /ربح|ارباح|عائد|عوائد|return|profit|rendement|gain|roi|interest|yield/u,
+        /ربح|ارباح|عائد|عوائد|return|profit|rendement|gain|roi|interest|yield|احسب|calculate|calcul/u,
       ],
-      pick: (faq) => {
-        const invest = faq.find((x) => /invest|استثمار|investir/i.test(x.question));
-        const min = faq.find((x) => /minimum|ادنى|minimum/i.test(x.question));
-        return [invest?.answer, min?.answer].filter(Boolean).join('\n\n');
-      },
+      pick: (_faq, c) =>
+        c.returnsReply ??
+        'Returns depend on the project annual rate and duration. Check the simulator tab for projections and your portfolio for actual performance.',
     },
     {
       id: 'invest',
       patterns: [
-        /استثمار|استثمر|invest|investir|projet|project|portfolio|محفظ|amount|مبلغ/u,
+        /استثمار|استثمر|invest|investir|projet|project|portfolio|محفظ|amount|مبلغ|ابد|commencer|start/u,
       ],
-      pick: (faq) => {
-        const start = faq[0];
-        const min = faq.find((x) => /minimum|ادنى|minimum/i.test(x.question));
-        return [start?.answer, min?.answer].filter(Boolean).join('\n\n');
-      },
+      pick: (_faq, c) =>
+        c.investReply ??
+        'Browse published projects, pick an amount that meets the minimum, and confirm from your wallet balance.',
     },
     {
       id: 'verify',
       patterns: [
         /وثق|توثيق|verify|verification|kyc|identity|identite|هوية|حساب/u,
       ],
-      pick: (faq) => faq.find((x) => /verify|وثق|verification/i.test(x.question))?.answer ?? faq[2]?.answer ?? '',
+      pick: (_faq, c) =>
+        c.verifyReply ??
+        faq.find((x) => /verify|وثق|verification/i.test(x.question))?.answer ??
+        faq[2]?.answer ??
+        '',
     },
   ];
 }
@@ -133,6 +136,20 @@ function localFaqAnswer(
   }
 
   return faqItems[0]?.answer ?? faqItems[2]?.answer ?? '';
+}
+
+/** Map localized quick-chip labels to dedicated smart replies when available. */
+export function getQuickChipReply(
+  chipLabel: string,
+  quickLabels: { invest: string; returns: string; topUp: string; verify: string },
+  ctx: SmartReplyContext,
+): string | null {
+  const trimmed = chipLabel.trim();
+  if (trimmed === quickLabels.invest.trim() && ctx.investReply) return ctx.investReply;
+  if (trimmed === quickLabels.returns.trim() && ctx.returnsReply) return ctx.returnsReply;
+  if (trimmed === quickLabels.topUp.trim() && ctx.topUpReply) return ctx.topUpReply;
+  if (trimmed === quickLabels.verify.trim() && ctx.verifyReply) return ctx.verifyReply;
+  return null;
 }
 
 export type ChatbotApiPayload = {

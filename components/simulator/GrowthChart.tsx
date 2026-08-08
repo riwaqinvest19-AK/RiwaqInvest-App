@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Easing, Text, View } from 'react-native';
+import { Animated, Easing, Platform, Text, useWindowDimensions, View } from 'react-native';
 import Svg, {
   Defs,
   G,
@@ -33,13 +33,16 @@ export function GrowthChart({
   numberLocale: string;
   legendLabel: string;
 }) {
-  const [w, setW] = useState(0);
-  const reveal = useRef(new Animated.Value(0)).current;
+  const { width: windowWidth } = useWindowDimensions();
+  const [layoutW, setLayoutW] = useState(0);
+  const reveal = useRef(new Animated.Value(Platform.OS === 'web' ? 1 : 0)).current;
   const H = 200;
   const padL = 40;
   const padR = 12;
   const padT = 16;
   const padB = 28;
+
+  const w = layoutW >= 60 ? layoutW : Math.max(0, Math.round(windowWidth) - 48);
 
   const innerW = Math.max(0, w - padL - padR);
   const innerH = H - padT - padB;
@@ -106,6 +109,7 @@ export function GrowthChart({
   }, [chartPoints, innerW, innerH]);
 
   useEffect(() => {
+    if (Platform.OS === 'web') return;
     if (!linePath || !areaPath || innerW <= 0 || innerH <= 0) return;
     reveal.stopAnimation();
     reveal.setValue(0);
@@ -125,7 +129,10 @@ export function GrowthChart({
   const AnimatedView = useMemo(() => Animated.createAnimatedComponent(View), []);
 
   return (
-    <View className="w-full" onLayout={(e) => setW(Math.round(e.nativeEvent.layout.width))}>
+    <View
+      className="w-full"
+      style={{ minHeight: H }}
+      onLayout={(e) => setLayoutW(Math.round(e.nativeEvent.layout.width))}>
       {w >= 60 && linePath ? (
         <AnimatedView style={{ opacity: chartOpacity }}>
         <Svg width={w} height={H}>

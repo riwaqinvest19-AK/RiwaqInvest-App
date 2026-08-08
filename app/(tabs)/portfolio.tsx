@@ -19,6 +19,7 @@ import {
   PORTFOLIO_CHART_COLORS,
   PortfolioDonutChart,
 } from '@/components/portfolio/PortfolioDonutChart';
+import { PaymentDetailsPanel } from '@/components/payments/PaymentDetailsPanel';
 import { formatFundingShort } from '@/components/projects/ProjectCard';
 import { shareReturnsStatementPdf } from '@/lib/returnsStatementPdf';
 import { showWithdrawFlow } from '@/lib/withdrawFlow';
@@ -130,6 +131,7 @@ export default function PortfolioScreen() {
   const [error, setError] = useState<string | null>(null);
   const [imageFailures, setImageFailures] = useState<Record<string, boolean>>({});
   const [listTab, setListTab] = useState<'active' | 'completed'>('active');
+  const [fundMethod, setFundMethod] = useState<'transfer' | 'ccp'>('transfer');
   const [returnsDownloadLoading, setReturnsDownloadLoading] = useState(false);
   const returnsDownloadBusyRef = useRef(false);
 
@@ -494,6 +496,51 @@ export default function PortfolioScreen() {
                 </View>
                 <Ionicons name="download-outline" size={26} color="#fff" />
               </Pressable>
+
+              <View className="mt-4 rounded-2xl bg-white p-4" style={cardShadow()}>
+                <Text className="text-right font-cairo-bold text-base text-neutral-900">
+                  {t('wallet.fundWalletTitle')}
+                </Text>
+                <Text className="mt-1 text-right font-cairo text-xs leading-5 text-muted-label">
+                  {t('wallet.fundWalletHint')}
+                </Text>
+
+                <View className="mt-3 flex-row gap-2 rounded-2xl bg-[#E8ECF0] p-1">
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setFundMethod('transfer')}
+                    className={`flex-1 rounded-xl py-2.5 ${
+                      fundMethod === 'transfer' ? 'bg-white' : 'bg-transparent'
+                    }`}>
+                    <Text
+                      className={`text-center font-cairo-semibold text-xs ${
+                        fundMethod === 'transfer' ? 'text-[#004080]' : 'text-muted-label'
+                      }`}>
+                      {t('wallet.fundMethodBank')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    accessibilityRole="button"
+                    onPress={() => setFundMethod('ccp')}
+                    className={`flex-1 rounded-xl py-2.5 ${
+                      fundMethod === 'ccp' ? 'bg-white' : 'bg-transparent'
+                    }`}>
+                    <Text
+                      className={`text-center font-cairo-semibold text-xs ${
+                        fundMethod === 'ccp' ? 'text-[#004080]' : 'text-muted-label'
+                      }`}>
+                      {t('wallet.fundMethodCcp')}
+                    </Text>
+                  </Pressable>
+                </View>
+
+                <View className="mt-3">
+                  <PaymentDetailsPanel
+                    variant="light"
+                    showRip={fundMethod === 'ccp'}
+                  />
+                </View>
+              </View>
 
               {/* Filter tabs */}
               <View className="mt-5 rounded-2xl bg-[#E8ECF0] p-1">
